@@ -1,0 +1,15 @@
+{
+  "app": {
+    "name": "자리 배치표",
+    "url": "https://seat-chart-one.vercel.app",
+    "stack": "Next.js"
+  },
+  "tracks": [
+    "security"
+  ],
+  "edzipCase": null,
+  "teacher": {
+    "dormsHandle": ""
+  },
+  "ownershipConfirmed": true
+}
