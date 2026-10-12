@@ -36,7 +36,7 @@ export type ChartData = {
   separations: Separation[];
 };
 
-const HIDDEN_WARNING = "비밀 설정 조건을 모두 지키는 배치를 찾지 못했어요. 비밀 설정을 열어 확인해 주세요.";
+const HIDDEN_WARNING = "설정 조건을 모두 지키는 배치를 찾지 못했어요. 설정을 열어 확인해 주세요.";
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, Number.isFinite(value) ? Math.round(value) : min));
@@ -277,7 +277,7 @@ export default function SeatEditor({
                   onClick={() => setShowSecret(true)}
                   className="flex w-full items-center justify-between rounded-xl bg-white p-4 text-left shadow-sm ring-1 ring-black/5"
                 >
-                  <span className="font-semibold">🔒 비밀 설정</span>
+                  <span className="font-semibold">설정</span>
                   <span className="text-xs text-gray-500">
                     {conflicts.size > 0 && <span className="mr-2 text-red-600">확인 필요</span>}
                     열기
