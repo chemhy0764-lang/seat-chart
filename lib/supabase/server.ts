@@ -1,7 +1,10 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { connection } from "next/server";
 
 export async function createClient() {
+  // 로그인 세션은 요청마다 달라서 미리 렌더링하지 않는다 (Supabase가 내부에서 Date.now()를 쓴다).
+  await connection();
   const cookieStore = await cookies();
 
   return createServerClient(
