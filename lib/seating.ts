@@ -72,6 +72,9 @@ export type ShuffleResult = { seats: (string | null)[]; warnings: string[] };
 
 const MAX_ATTEMPTS = 500;
 
+export const SEPARATION_WARNING =
+  "떨어져 앉을 학생 조건을 모두 지킬 수 있는 배치를 찾지 못했어요. 빨간 칸을 끌어서 직접 옮겨 주세요.";
+
 export function shuffleSeats(
   students: Student[],
   layout: Layout,
@@ -122,9 +125,7 @@ export function shuffleSeats(
     const seats = attempt(true);
     if (seats) return { seats, warnings };
   }
-  warnings.push(
-    "떨어져 앉을 학생 조건을 모두 지킬 수 있는 배치를 찾지 못했어요. 빨간 칸을 끌어서 직접 옮겨 주세요.",
-  );
+  warnings.push(SEPARATION_WARNING);
   return { seats: attempt(false)!, warnings };
 }
 

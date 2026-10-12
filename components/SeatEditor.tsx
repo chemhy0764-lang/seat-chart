@@ -22,6 +22,7 @@ import {
   unseated,
   type Separation,
   type Student,
+  SEPARATION_WARNING,
 } from "@/lib/seating";
 import SeatGrid, { StudentChip, type View } from "./SeatGrid";
 
@@ -34,6 +35,8 @@ export type ChartData = {
   seats: (string | null)[];
   separations: Separation[];
 };
+
+const HIDDEN_WARNING = "비밀 설정 조건을 모두 지키는 배치를 찾지 못했어요. 비밀 설정을 열어 확인해 주세요.";
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, Number.isFinite(value) ? Math.round(value) : min));
@@ -52,6 +55,8 @@ export default function SeatEditor({
   const [view, setView] = useState<View>("board-top");
   const [warnings, setWarnings] = useState<string[]>([]);
   const [status, setStatus] = useState<"saved" | "dirty" | "saving" | "error">("saved");
+  // 떨어져 앉을 학생은 학생들에게 비밀이다. 화면을 띄워 둘 수 있으니 기본은 닫아 둔다.
+  const [showSecret, setShowSecret] = useState(false);
 
   const studentsById = useMemo(
     () => new Map(chart.students.map((s) => [s.id, s])),
@@ -259,12 +264,26 @@ export default function SeatEditor({
                 )}
               </section>
 
-              <SeparationPanel
-                students={chart.students}
-                studentsById={studentsById}
-                separations={chart.separations}
-                onChange={(separations) => update({ separations })}
-              />
+              {showSecret ? (
+                <SeparationPanel
+                  students={chart.students}
+                  studentsById={studentsById}
+                  separations={chart.separations}
+                  onChange={(separations) => update({ separations })}
+                  onHide={() => setShowSecret(false)}
+                />
+              ) : (
+                <button
+                  onClick={() => setShowSecret(true)}
+                  className="flex w-full items-center justify-between rounded-xl bg-white p-4 text-left shadow-sm ring-1 ring-black/5"
+                >
+                  <span className="font-semibold">🔒 비밀 설정</span>
+                  <span className="text-xs text-gray-500">
+                    {conflicts.size > 0 && <span className="mr-2 text-red-600">확인 필요</span>}
+                    열기
+                  </span>
+                </button>
+              )}
 
               <WaitingArea students={waiting} />
             </aside>
@@ -320,7 +339,7 @@ export default function SeatEditor({
                 </div>
               </div>
 
-              {warnings.map((w) => (
+              {warnings.map((w) => (showSecret ? w : w.replace(SEPARATION_WARNING, HIDDEN_WARNING))).map((w) => (
                 <p key={w} className="rounded-md bg-amber-50 p-2 text-sm text-amber-900">
                   {w}
                 </p>
@@ -329,7 +348,7 @@ export default function SeatEditor({
               <p className="text-xs text-gray-500">
                 이름을 끌어서 다른 자리에 놓으면 두 학생 자리가 바뀌어요. 노란 칸은 앞줄 우선 범위예요.
               </p>
-              {conflicts.size > 0 && (
+              {showSecret && conflicts.size > 0 && (
                 <p className="rounded-md bg-red-50 p-2 text-sm text-red-800">
                   빨간 칸: 떨어져 앉아야 할 학생끼리 붙어 있어요. 끌어서 옮기거나 다시 섞어 주세요.
                 </p>
@@ -345,7 +364,7 @@ export default function SeatEditor({
                     frontRows={chart.frontRows}
                     view={view}
                     interactive
-                    conflicts={conflicts}
+                    conflicts={showSecret ? conflicts : undefined}
                   />
                 </div>
               </div>
@@ -429,11 +448,13 @@ function SeparationPanel({
   studentsById,
   separations,
   onChange,
+  onHide,
 }: {
   students: Student[];
   studentsById: Map<string, Student>;
   separations: Separation[];
   onChange: (separations: Separation[]) => void;
+  onHide: () => void;
 }) {
   const setGroup = (index: number, group: Separation | null) =>
     onChange(
@@ -444,7 +465,16 @@ function SeparationPanel({
 
   return (
     <section className="space-y-2 rounded-xl bg-white p-4 shadow-sm ring-1 ring-black/5">
-      <h2 className="font-semibold">떨어져 앉을 학생</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="font-semibold">🔓 떨어져 앉을 학생</h2>
+        <button
+          onClick={onHide}
+          className="rounded-md bg-gray-800 px-3 py-1 text-xs font-semibold text-white"
+        >
+          숨기기
+        </button>
+      </div>
+      <p className="text-xs text-red-700">학생들이 보는 화면에서는 [숨기기]를 눌러 주세요.</p>
       <p className="text-xs text-gray-500">
         같은 묶음 학생끼리는 짝이 되지 않고, 앞뒤·옆·대각선으로도 붙어 앉지 않아요.
       </p>
