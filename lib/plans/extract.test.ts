@@ -55,7 +55,9 @@ test("분할점수 hwpx 표에서 붙여넣기 형식 글자를 읽어 와 다�
     assert.equal(lines.filter((l) => l === "고정").length, 3, `${kind}: 고정 표시`);
     for (const g of [1, 2, 3]) {
       const n = docs.valueCountFor(kind, g);
-      assert.ok(lines.includes(["추정과목A" + g, ...Array(n).fill("80")].join("\t")), `${kind} ${g}학년 추정과목A`);
+      // 소수 자리: 1차·2차 정기시험은 소수 둘째 자리, 학기말(2차 문서의 뒤쪽 절반)은 일의 자리
+      const shown = kind === "first" ? Array(n).fill("80.00") : [...Array(n / 2).fill("80.00"), ...Array(n / 2).fill("80")];
+      assert.ok(lines.includes(["추정과목A" + g, ...shown].join("\t")), `${kind} ${g}학년 추정과목A`);
       assert.ok(lines.includes(["고정과목D" + g, ...Array(n).fill("·")].join("\t")), `${kind} ${g}학년 고정과목D`);
     }
     // 학년마다 값 개수가 다르므로 줄 하나를 골라 해당 학년 값 개수로 해석되는지 본다.
