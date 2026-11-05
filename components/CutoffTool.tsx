@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { GuideSection, NoticeSection } from "@/components/HwpxDocs";
+import { YEARS, type Semester } from "@/lib/hwpx/docs";
 import {
   LEVELS,
   approxSemester,
@@ -15,6 +17,7 @@ import {
   type Rates,
 } from "@/lib/cutoff";
 
+type Section = "guide" | "notice" | "check";
 type Tab = "paper" | "perf" | "term";
 
 const num = (s: string): number | null => (s.trim() === "" || Number.isNaN(Number(s)) ? null : Number(s));
@@ -22,6 +25,62 @@ const box = "space-y-3 rounded-xl bg-white p-4 shadow-sm ring-1 ring-black/5";
 const input = "w-20 rounded-md border border-gray-300 px-2 py-1 text-right";
 
 export default function CutoffTool() {
+  const [section, setSection] = useState<Section>("guide");
+  const [year, setYear] = useState<number>(YEARS[0]);
+  const [semester, setSemester] = useState<Semester>(1);
+  const sections: [Section, string][] = [
+    ["guide", "분할점수 안내"],
+    ["notice", "분할점수 공지"],
+    ["check", "점검 도구"],
+  ];
+  return (
+    <div className="space-y-4">
+      <nav className="flex flex-wrap gap-2 border-b border-gray-200 pb-3">
+        {sections.map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setSection(key)}
+            className={`rounded-md px-4 py-2 text-sm font-bold ${
+              section === key ? "bg-blue-600 text-white" : "border border-gray-300 bg-white"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </nav>
+      {section !== "check" && (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl bg-white p-3 text-sm shadow-sm ring-1 ring-black/5">
+          <label className="flex items-center gap-2 font-semibold">
+            학년도
+            <select className="rounded-md border border-gray-300 px-2 py-1" value={year} onChange={(e) => setYear(Number(e.target.value))}>
+              {YEARS.map((y) => (
+                <option key={y} value={y}>
+                  {y}학년도
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex items-center gap-2 font-semibold">
+            학기
+            <select
+              className="rounded-md border border-gray-300 px-2 py-1"
+              value={semester}
+              onChange={(e) => setSemester(Number(e.target.value) as Semester)}
+            >
+              <option value={1}>1학기</option>
+              <option value={2}>2학기</option>
+            </select>
+          </label>
+        </div>
+      )}
+      {section === "guide" && <GuideSection term={{ year, semester }} />}
+      {section === "notice" && <NoticeSection term={{ year, semester }} />}
+      {section === "check" && <CheckTool />}
+    </div>
+  );
+}
+
+function CheckTool() {
   const [tab, setTab] = useState<Tab>("paper");
   const tabs: [Tab, string][] = [
     ["paper", "정기시험 예상정답률"],
