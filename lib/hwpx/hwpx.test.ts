@@ -260,3 +260,29 @@ test("교과협의록: 빨간 글자가 모두 검은색이 되고, 다른 서�
   assert.ok((await colorsOf(guide)).some(isRedColor), "산출 안내의 강조 표시는 그대로여야 해요");
 });
 
+
+test("가정통신문 소수 자리: 1차·2차 정기시험은 소수 둘째 자리, 학기말은 일의 자리", async () => {
+  const date = { year: 2027, month: 4, day: 20 };
+  const first = parseCutoffText("추정\n소수교과A\t90.5\t75\t60.123\t45.1\n고정\n소수교과B\t80\t-\t·\t30.999", 0, 4);
+  const firstDoc = await sectionOf(
+    await docs.buildNotice(tpl("notice-written"), {
+      year: 2027, semester: 1, kind: "first", grades: [{ grade: 1, groups: parseCutoffText("추정\n소수교과A\t90.5\t75\t60.123\t45.1\t30", 0, 5).groups }, { grade: 2, groups: first.groups }], date,
+    }),
+  );
+  const t1 = allText(firstDoc);
+  for (const v of ["90.50", "75.00", "60.12", "45.10", "30.00", "80.00", "31.00"]) assert.ok(t1.includes(v), `1차: ${v}`);
+  assert.ok(!t1.includes("90.5\n") && !t1.includes("60.123"));
+
+  const term = parseCutoffText("추정\n소수교과C\t90.5\t75\t60.123\t45.1\t81.4\t66.5\t51.49\t36.6", 0, 8);
+  const termDoc = await sectionOf(
+    await docs.buildNotice(tpl("notice-term"), {
+      year: 2027, semester: 1, kind: "term",
+      grades: [{ grade: 1, groups: parseCutoffText("추정\n소수교과C\t90.5\t75\t60.123\t45.1\t30\t81.4\t66.5\t51.49\t36.6\t20.2", 0, 10).groups }, { grade: 2, groups: term.groups }],
+      date,
+    }),
+  );
+  const t2 = allText(termDoc);
+  for (const v of ["90.50", "60.12", "45.10"]) assert.ok(t2.includes(v), `2차: ${v}`); // 2차 정기시험: 소수 둘째 자리
+  for (const v of ["81", "67", "51", "37"]) assert.ok(t2.includes(v), `학기말: ${v}`);
+  assert.ok(!t2.includes("81.4") && !t2.includes("51.49") && !t2.includes("66.5"), "학기말에 소수가 남아 있어요");
+});

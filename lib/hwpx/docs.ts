@@ -119,13 +119,23 @@ export const valueCountFor = (kind: NoticeKind, grade: number): number => {
   return kind === "term" ? n * 2 : n;
 };
 
+/** 숫자는 digits 자리까지(반올림)로 쓰고, -·· 같은 빈 칸 표시는 그대로 둔다. */
+export function formatCutoff(value: string, digits: number | null): string {
+  if (digits === null || !/^\d+(?:\.\d+)?$/.test(value)) return value;
+  return Number(value).toFixed(digits);
+}
+
 const groupLines = (kind: string) => ["성취수준별", kind, "분할점수"];
 
 function specFor(o: NoticeOptions, g: GradeData): TableSpec {
   // 2차·학기말 표는 칸이 좁아 서식처럼 'E/I'와 '(미도달)'을 두 줄로 쓴다.
   const labels = g.grade === 1 ? (o.kind === "term" ? [...LABELS4, "E/I\n(미도달)"] : LABELS5) : LABELS4;
   const s = o.semester;
-  const rowsOf = (x: ParsedGroup) => x.rows.map((r) => ({ name: r.name, lead: r.lead, values: r.values }));
+  // 소수 자리를 맞춘다: 1차·2차 정기시험은 소수 둘째 자리까지, 학기말은 일의 자리까지. 수행평가는 입력한 그대로 둔다.
+  const digitsOf = (j: number, count: number): number | null =>
+    o.kind === "first" ? 2 : o.kind === "term" ? (j < count / 2 ? 2 : 0) : null;
+  const rowsOf = (x: ParsedGroup) =>
+    x.rows.map((r) => ({ name: r.name, lead: r.lead, values: r.values.map((v, j) => formatCutoff(v, digitsOf(j, r.values.length))) }));
   if (o.kind === "perf") {
     return {
       titles: [{ title: `${s}학기 수행평가 분할점수(단위: 점)`, labels }],
