@@ -1,5 +1,16 @@
 -- 되돌리기는 위에서부터 순서대로 실행한다.
 
+-- 20261105020000_curriculum_uploads 되돌리기 (올린 편제표 기록과 hwp 기록이 지워진다. 파일은 대시보드 Storage의 plans 버킷에서 따로 지운다)
+delete from public.plan_uploads where kind = 'curriculum' or file_type = 'hwp';
+alter table public.plan_uploads drop constraint plan_uploads_kind_check;
+alter table public.plan_uploads add constraint plan_uploads_kind_check check (kind in ('minutes', 'cutoffs'));
+alter table public.plan_uploads drop constraint plan_uploads_file_type_check;
+alter table public.plan_uploads add constraint plan_uploads_file_type_check check (file_type in ('hwpx', 'pdf', 'xlsx'));
+drop policy "관리자만 자료 올리기" on storage.objects;
+create policy "관리자만 자료 올리기" on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'plans' and public.is_admin() and lower(name) ~ '\.(hwpx|pdf|xlsx)$');
+
 -- 20261105010000_plan_uploads 되돌리기 (올린 자료 기록과 관리자 목록이 지워진다. 파일은 대시보드 Storage의 plans 버킷에서 따로 지운다)
 drop policy if exists "관리자만 자료 올리기" on storage.objects;
 drop policy if exists "로그인한 사용자 자료 읽기" on storage.objects;

@@ -17,11 +17,13 @@ const field = "rounded-md border border-gray-300 px-2 py-1";
 const primary = "rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40";
 
 const GRADES = ["1", "2", "3"];
+/** 이 탭에서 다루는 자료 종류(편제표는 '편제표' 탭에서 따로 다룬다) */
+type DocKind = Exclude<PlanKind, "curriculum">;
 
 export default function PlanFiles({ term }: { term: Term }) {
   const { year, semester } = term;
   const [admin, setAdmin] = useState<boolean | null>(null);
-  const [rows, setRows] = useState<Record<PlanKind, PlanRow[]>>({ minutes: [], cutoffs: [] });
+  const [rows, setRows] = useState<Record<DocKind, PlanRow[]>>({ minutes: [], cutoffs: [] });
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
 
@@ -111,7 +113,7 @@ type Form = {
 
 const BLANK_TEXTS: Record<NoticeKind, string> = { first: "", perf: "", term: "" };
 
-const blankForm = (kind: PlanKind): Form => ({
+const blankForm = (kind: DocKind): Form => ({
   scope: kind === "minutes" ? "" : "1",
   exam: "",
   file: null,
@@ -131,7 +133,7 @@ function PlanSection({
   admin,
   onSaved,
 }: {
-  kind: PlanKind;
+  kind: DocKind;
   term: Term;
   rows: PlanRow[];
   admin: boolean;

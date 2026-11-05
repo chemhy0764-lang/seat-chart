@@ -8,7 +8,8 @@ import { looksLikeNeis, neisTexts, parseNeisRows, type NeisTexts } from "./neis.
 import { looksLikeNeisPdf, parseNeisPdf } from "./neis-pdf.ts";
 import { minutesFromPdf, readPdfPages, subjectsFromRows, type PdfJs, type SubjectPlan } from "./pdf.ts";
 
-export type FileType = "hwpx" | "pdf" | "xlsx";
+/** hwp(이진 한글 파일)는 편제표에서만 쓴다. */
+export type FileType = "hwpx" | "pdf" | "xlsx" | "hwp";
 export type MinutesData = {
   place: string;
   attendees: string;

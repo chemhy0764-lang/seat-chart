@@ -1,12 +1,12 @@
 import { createClient } from "../supabase/client";
 import { fileTypeOf, type FileType } from "./extract";
 
-export type PlanKind = "minutes" | "cutoffs";
+export type PlanKind = "minutes" | "cutoffs" | "curriculum";
 
 export type PlanRow = {
   id: string;
   kind: PlanKind;
-  /** 협의록은 교과, 추정분할점수는 학년('1','2','3') */
+  /** 협의록은 교과, 추정분할점수와 편제표는 학년('1','2','3') */
   scope: string;
   year: number;
   semester: number;
@@ -104,8 +104,8 @@ export async function savePlan(input: SaveInput): Promise<PlanRow> {
   let file_type: FileType;
 
   if (input.file) {
-    const type = fileTypeOf(input.file.name);
-    if (!type) throw new Error("hwpx, xlsx, pdf 파일만 올릴 수 있어요.");
+    const type = input.kind === "curriculum" ? (/\.hwp$/i.test(input.file.name) ? "hwp" : null) : fileTypeOf(input.file.name);
+    if (!type) throw new Error(input.kind === "curriculum" ? "편제표는 hwp 파일만 올릴 수 있어요." : "hwpx, xlsx, pdf 파일만 올릴 수 있어요.");
     file_path = `${input.kind}/${crypto.randomUUID()}.${type}`;
     file_name = input.file.name;
     file_type = type;

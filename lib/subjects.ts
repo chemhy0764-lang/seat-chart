@@ -19,7 +19,7 @@ export const SUBJECTS_BY_AREA: Record<(typeof AREAS)[number], string[]> = {
     "물리학", "화학", "생명과학", "지구과학", "역학과 에너지", "물질과 에너지", "세포와 물질대사", "지구시스템과학",
     "물리학Ⅱ", "화학Ⅱ", "생명과학Ⅱ", "지구과학Ⅱ", "생활과 과학", "생태와 환경", "공학 일반", "생명과학 실험", "고급 화학",
   ],
-  예체능: ["체육1", "체육2", "운동과 건강", "스포츠 생활", "음악", "음악 연주", "미술", "미술 창작"],
+  예체능: ["체육1", "체육2", "운동과 건강", "스포츠 생활1", "스포츠 생활", "음악", "음악 연주", "미술", "미술 창작"],
   "기술·가정": ["기술·가정"],
   "제2외국어·한문": ["일본어Ⅰ", "일본어Ⅱ", "일본어", "일본어 회화", "중국어Ⅰ", "중국어Ⅱ", "중국어", "중국어 회화", "한문Ⅰ", "한문Ⅱ", "한문", "한문 고전 읽기"],
   교양: ["인간과 심리", "인공지능 수학"],
@@ -33,7 +33,7 @@ export function subjectsFor(area: string): string[] {
 // ───────── 올린 협의록의 이름을 목록의 이름에 맞추기 ─────────
 
 /** 공백·가운뎃점·쉼표를 없애고 로마자 숫자(II, I)를 Ⅱ, Ⅰ로 맞춘 비교용 글자. */
-const key = (name: string) =>
+export const nameKey = (name: string) =>
   name
     .replace(/[\s·,，]/g, "")
     .replace(/([가-힣])II$/, "$1Ⅱ")
@@ -41,7 +41,7 @@ const key = (name: string) =>
 
 /** 올린 파일의 과목 이름이 해당 교과 목록에 있으면 목록의 표기로, 없으면 그대로. */
 export function canonicalSubject(raw: string, area: string): { name: string; inList: boolean } {
-  const hit = subjectsFor(area).find((s) => key(s) === key(raw));
+  const hit = subjectsFor(area).find((s) => nameKey(s) === nameKey(raw));
   return hit ? { name: hit, inList: true } : { name: raw.trim(), inList: false };
 }
 
@@ -50,10 +50,10 @@ export function canonicalSubject(raw: string, area: string): { name: string; inL
  * 교과 이름이 아니라 교양 과목 이름이 제목에 쓰인 경우(인간과 심리)는 그 과목이 든 교과로 본다. 모르면 빈 글자.
  */
 export function matchArea(raw: string): string {
-  const k = key(raw);
+  const k = nameKey(raw);
   if (k === "") return "";
-  const direct = AREAS.find((a) => key(a) === k);
+  const direct = AREAS.find((a) => nameKey(a) === k);
   if (direct) return direct;
-  return AREAS.find((a) => SUBJECTS_BY_AREA[a].some((s) => key(s) === k)) ?? "";
+  return AREAS.find((a) => SUBJECTS_BY_AREA[a].some((s) => nameKey(s) === k)) ?? "";
 }
 
