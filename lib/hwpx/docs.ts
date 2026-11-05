@@ -1,7 +1,7 @@
 import { children, descendants, first, removeAll } from "./dom.ts";
 import { openPackage, savePackage, type Pkg } from "./package.ts";
 import type { ParsedGroup } from "./data.ts";
-import { buildTable, cellAt, F4, F5, PERF4, PERF5, tablesOf, type SpecGroup, type TableSpec } from "./tables.ts";
+import { buildTable, cellAt, F4, F5, PERF4, PERF5, T10, T12, tablesOf, type SpecGroup, type TableSpec } from "./tables.ts";
 import { paragraphText, replaceAll, replaceInParagraph, setCellText, setParagraphText } from "./text.ts";
 
 export const YEARS = [2026, 2027, 2028] as const;
@@ -13,6 +13,7 @@ export type Templates = {
   guideSecond: ArrayBuffer | Uint8Array;
   minutes: ArrayBuffer | Uint8Array;
   noticeWritten: ArrayBuffer | Uint8Array;
+  noticeTerm: ArrayBuffer | Uint8Array;
   noticePerf: ArrayBuffer | Uint8Array;
 };
 
@@ -120,7 +121,8 @@ export const valueCountFor = (kind: NoticeKind, grade: number): number => {
 const groupLines = (kind: string) => ["성취수준별", kind, "분할점수"];
 
 function specFor(o: NoticeOptions, g: GradeData): TableSpec {
-  const labels = g.grade === 1 ? LABELS5 : LABELS4;
+  // 2차·학기말 표는 칸이 좁아 서식처럼 'E/I'와 '(미도달)'을 두 줄로 쓴다.
+  const labels = g.grade === 1 ? (o.kind === "term" ? [...LABELS4, "E/I\n(미도달)"] : LABELS5) : LABELS4;
   const s = o.semester;
   const rowsOf = (x: ParsedGroup) => x.rows.map((r) => ({ name: r.name, lead: r.lead, values: r.values }));
   if (o.kind === "perf") {
@@ -156,7 +158,7 @@ function fillTables(pkg: Pkg, o: NoticeOptions): Element[] {
   const perf = o.kind === "perf";
   // 표 순서: 0 머리글, 1 제목, 2·3·4 학년별 자료(수행평가는 2·3학년 표만 있다), 마지막 날짜·직인
   const targets = perf ? [tables[2], tables[3]] : [tables[2], tables[3], tables[4]];
-  const families = perf ? [PERF5, PERF4] : [F5, F4, F4];
+  const families = perf ? [PERF5, PERF4] : o.kind === "term" ? [T12, T10, T10] : [F5, F4, F4];
   const sources = perf ? [tables[2], tables[3]] : [tables[2], tables[3], tables[3]];
   // 서식 표는 바꾸기 전 복사본에서 본뜬다.
   const frozen = sources.map((t) => t.cloneNode(true) as Element);
@@ -169,16 +171,23 @@ function fillTables(pkg: Pkg, o: NoticeOptions): Element[] {
   });
 }
 
-/** 서식 파일이 만들어진 학년도·학기와 공지일(글자 치환의 기준) */
-const NOTICE_BASE = { year: 2026, semester: 2, date: "2026. 10. 1." };
+/** 서식 파일이 만들어진 학년도·학기와 공지일(글자 치환의 기준). 2차·학기말 서식은 2025학년도 2학기 파일이다. */
+const NOTICE_BASE = {
+  written: { year: 2026, semester: 2, date: "2026. 10. 1." },
+  term: { year: 2025, semester: 2, date: "2025. 12. 19." },
+};
 
 function noticeTextPairs(o: NoticeOptions): [string, string][] {
+  const base = o.kind === "term" ? NOTICE_BASE.term : NOTICE_BASE.written;
   const pairs: [string, string][] = [
-    [`${NOTICE_BASE.year}학년도`, `${o.year}학년도`],
-    [`${NOTICE_BASE.semester}학기`, `${o.semester}학기`],
-    [NOTICE_BASE.date, `${o.date.year}. ${o.date.month}. ${o.date.day}.`],
+    [`${base.year}학년도`, `${o.year}학년도`],
+    [`${base.semester}학기`, `${o.semester}학기`],
   ];
-  if (o.kind === "term") pairs.push(["1차 정기시험", "2차 정기시험 및 학기말"]);
+  if (o.kind === "term") {
+    // 2025학년도 서식은 '지필평가'·'교과별'로 적혀 있고 3학년 표 제목이 학기말뿐이다.
+    pairs.push(["지필평가", "정기시험"], ["3학년 학기말", "3학년 2차 정기시험 및 학기말"], ["교과별 분할점수", "과목별 분할점수"]);
+  }
+  pairs.push([base.date, `${o.date.year}. ${o.date.month}. ${o.date.day}.`]);
   return pairs;
 }
 
@@ -238,7 +247,7 @@ export async function buildMeeting(data: ArrayBuffer | Uint8Array, o: Omit<Notic
 
   const title = paras[heading].cloneNode(true) as Element;
   const examText = o.kind === "first" ? "1차 정기시험" : "2차 정기시험 및 학기말";
-  setParagraphText(title, `${o.year}학년도 ${o.semester}학기 ${examText} 교과별 분할점수`);
+  setParagraphText(title, `${o.year}학년도 ${o.semester}학기 ${examText} 과목별 분할점수`);
   root.insertBefore(title, paras[heading]);
   return savePackage(pkg);
 }

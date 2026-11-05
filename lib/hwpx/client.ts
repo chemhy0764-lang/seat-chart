@@ -6,6 +6,7 @@ const NAMES: Record<keyof Templates, string> = {
   guideSecond: "guide-2nd",
   minutes: "minutes",
   noticeWritten: "notice-written",
+  noticeTerm: "notice-term",
   noticePerf: "notice-perf",
 };
 

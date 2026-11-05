@@ -8,7 +8,7 @@ Object.assign(globalThis, { DOMParser: XmlDomParser, XMLSerializer: XmlSerialize
 
 const { children, descendants, first, parseXml } = await import("./dom.ts");
 const { replaceInParagraph, paragraphText } = await import("./text.ts");
-const { buildTable, tablesOf, F4, F5, PERF4, PERF5 } = await import("./tables.ts");
+const { buildTable, tablesOf, F4, F5, PERF4, PERF5, T10, T12 } = await import("./tables.ts");
 const { openPackage } = await import("./package.ts");
 const docs = await import("./docs.ts");
 const { parseCutoffText } = await import("./data.ts");
@@ -73,6 +73,8 @@ test("원본과 같은 자료로 만든 표는 원본 표와 같다(칸 위치·
     ["notice-written", 2, F5],
     ["notice-perf", 2, PERF5],
     ["notice-perf", 3, PERF4],
+    ["notice-term", 2, T12],
+    ["notice-term", 3, T10],
   ];
   for (const [name, idx, family] of cases) {
     const doc = await sectionOf(tpl(name));
@@ -80,9 +82,12 @@ test("원본과 같은 자료로 만든 표는 원본 표와 같다(칸 위치·
     const cells = readTable(original);
     const hasGroup = family.hasGroup;
     const lead = family.hasLead ? 1 : 0;
-    const titleCell = cells.find((c) => c.row === 0 && c.cs > 1)!;
+    const titleCells = cells.filter((c) => c.row === 0 && c.cs > 1).sort((a, b) => a.col - b.col);
     const labelRow = cells.filter((c) => c.row === 1).sort((a, b) => a.col - b.col);
-    const labels = labelRow.map((c) => c.text[0]);
+    const titles = titleCells.map((t, i) => ({
+      title: t.text[0],
+      labels: labelRow.filter((c) => c.col >= t.col + (i === 0 ? lead : 0) && c.col < t.col + t.cs).map((c) => c.text.join("\n")),
+    }));
     const dataRows = new Map<number, Cell[]>();
     for (const c of cells.filter((c) => c.row >= 2)) dataRows.set(c.row, [...(dataRows.get(c.row) ?? []), c]);
     const rowNums = [...dataRows.keys()].sort((a, b) => a - b);
@@ -100,15 +105,16 @@ test("원본과 같은 자료로 만든 표는 원본 표와 같다(칸 위치·
         values: body.slice(1 + lead).map((c) => c.text[0]),
       });
     }
-    const leadLabel = lead ? labels[0] : undefined;
-    const spec = {
-      titles: [{ title: titleCell.text[0], labels: lead ? labels.slice(1) : labels }],
-      leadLabel,
-      groups,
-    };
+    const leadLabel = lead ? labelRow[0].text[0] : undefined;
+    const nameLabel = cells.find((c) => c.row === 0 && c.col === (hasGroup ? 1 : 0))!.text[0];
+    const spec = { titles, leadLabel, nameLabel, groups };
     const built = buildTable(original, family, spec, "123");
     assertCovers(built);
-    const strip = (cs: Cell[]) => cs.map((c) => JSON.stringify([c.col, c.row, c.cs, c.rs, c.fill, c.w, c.text]));
+    // 2차·학기말 서식 표에는 테두리 번호가 다른 줄과 어긋난 칸이 몇 개 있어(손으로 고친 흔적: 1학년 표 마지막 열 9·11번째 줄, 2학년 표 5번째 줄 학기말 3칸) 비교에서 뺀다.
+    const quirk = (c: Cell) =>
+      name === "notice-term" &&
+      ((idx === 2 && c.col === 11 && (c.row === 9 || c.row === 11)) || (idx === 3 && c.row === 5 && c.col >= 7));
+    const strip = (cs: Cell[]) => cs.map((c) => JSON.stringify([c.col, c.row, c.cs, c.rs, quirk(c) ? "*" : c.fill, c.w, c.text]));
     // 줄 높이가 다른 칸은 서식이 같아도 높이만 다르므로 높이는 비교하지 않는다.
     assert.deepEqual(strip(readTable(built)), strip(cells), `${name} 표 ${idx}`);
   }
@@ -141,7 +147,7 @@ const gradesFor = (kind: "first" | "term" | "perf") =>
 test("가정통신문 3종과 회의 자료: 표가 온전하고 글자가 바뀐다", async () => {
   const date = { year: 2027, month: 4, day: 20 };
   for (const kind of ["first", "term", "perf"] as const) {
-    const bytes = await docs.buildNotice(tpl(kind === "perf" ? "notice-perf" : "notice-written"), {
+    const bytes = await docs.buildNotice(tpl(kind === "perf" ? "notice-perf" : kind === "term" ? "notice-term" : "notice-written"), {
       year: 2027, semester: 1, kind, grades: gradesFor(kind), date,
     });
     const doc = await sectionOf(bytes);
@@ -170,7 +176,7 @@ test("가정통신문 3종과 회의 자료: 표가 온전하고 글자가 바�
   assert.deepEqual(tablesOf(noThirdDoc).filter((t) => Number(t.getAttribute("colCnt")) > 5).map((t) => Number(t.getAttribute("colCnt"))), [8, 7]);
   assert.ok(allText(noThirdDoc).includes("2027학년도 1학기 3학년은 전 과목 고정분할"));
   for (const kind of ["first", "term"] as const) {
-    const bytes = await docs.buildMeeting(tpl("notice-written"), { year: 2027, semester: 2, kind, grades: gradesFor(kind), date });
+    const bytes = await docs.buildMeeting(tpl(kind === "term" ? "notice-term" : "notice-written"), { year: 2027, semester: 2, kind, grades: gradesFor(kind), date });
     const doc = await sectionOf(bytes);
     const text = allText(doc);
     assert.ok(!text.includes("가정통신문") && !text.includes("귀댁에") && !text.includes("교육과정운영"));

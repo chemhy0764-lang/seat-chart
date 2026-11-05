@@ -337,7 +337,7 @@ export function NoticeSection({ term }: { term: Term }) {
             disabled={!ready || notice.busy}
             onClick={() =>
               notice.run("가정통신문", async () => {
-                const data = await loadTemplate(kind === "perf" ? "noticePerf" : "noticeWritten");
+                const data = await loadTemplate(kind === "perf" ? "noticePerf" : kind === "term" ? "noticeTerm" : "noticeWritten");
                 const bytes = await buildNotice(data, { ...term, kind, grades: gradeData(), date: noticeDate() });
                 saveFile(bytes, safeName(`${year}학년도 ${semester}학기 ${info.label} 분할점수 공지 가정통신문.hwpx`));
               })
@@ -351,7 +351,7 @@ export function NoticeSection({ term }: { term: Term }) {
             onClick={() =>
               meeting.run("학업성적관리회의 자료", async () => {
                 if (kind === "perf") return;
-                const data = await loadTemplate("noticeWritten");
+                const data = await loadTemplate(kind === "term" ? "noticeTerm" : "noticeWritten");
                 const bytes = await buildMeeting(data, { ...term, kind, grades: gradeData(), date: noticeDate() });
                 saveFile(bytes, safeName(`${year}학년도 ${semester}학기 학업성적관리회의 자료(${info.label} 분할점수).hwpx`));
               })
@@ -369,7 +369,7 @@ export function NoticeSection({ term }: { term: Term }) {
         <Message message={notice.message} />
         <Message message={meeting.message} />
         <p className="text-xs text-gray-500">
-          서식은 2026학년도 2학기 가정통신문 파일을 틀로 써요. 학교 이름, 인사말, 참고 내용은 틀 그대로입니다. 학업성적관리회의 자료는 원본이 없어
+          서식은 2026학년도 2학기 가정통신문(1차 정기시험, 수행평가)과 2025학년도 2학기 가정통신문(2차 정기시험·학기말)을 틀로 써요. 학교 이름, 인사말, 참고 내용은 틀 그대로입니다. 학업성적관리회의 자료는 원본이 없어
           가정통신문의 표 서식으로 만들었고, 줄 간격과 글꼴이 학교에서 쓰던 PDF와 조금 다를 수 있어요.
         </p>
       </section>
