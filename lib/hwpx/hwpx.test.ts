@@ -198,7 +198,8 @@ test("교과협의록: 칸과 과목 표가 채워진다", async () => {
   });
   const doc = await sectionOf(bytes);
   const text = allText(doc);
-  assert.ok(text.includes("( 과학 )과 회의록"));
+  assert.ok(text.includes("( 과학 ) 교과협의록"), "제목이 교과협의록으로 바뀌어야 해요");
+  assert.ok(!text.includes("회의록"), "회의록 표기가 남아 있어요");
   assert.ok(text.includes("2027학년도 1학기 1차 정기시험 원안지 검토 및 분할점수 산출"));
   assert.ok(text.includes("예시과목11") && text.includes("화학실") && text.includes("가, 나, 다"));
   assert.ok(!text.includes("권호중"), "원본 교사 이름이 남아 있어요(템플릿 값 치환 실패)");
@@ -217,3 +218,31 @@ test("붙여넣은 표 읽기", () => {
   assert.equal(p.groups[0].rows[0].lead, "52");
   assert.deepEqual(p.groups[0].rows[0].values, ["52", "45", "38", "28", "21"]);
 });
+
+test("교과협의록: 빨간 글자가 모두 검은색이 되고, 다른 서식은 그대로다", async () => {
+  const isRedColor = (hex: string) => {
+    const h = hex.replace("#", "");
+    return parseInt(h.slice(0, 2), 16) >= 0xc0 && parseInt(h.slice(2, 4), 16) <= 0x60 && parseInt(h.slice(4, 6), 16) <= 0x60;
+  };
+  const colorsOf = async (bytes: Uint8Array) => {
+    const xml = (await (await JSZip.loadAsync(bytes)).file("Contents/header.xml")!.async("string")) as string;
+    return [...xml.matchAll(/textColor="(#[0-9a-fA-F]{6})"/g)].map((m) => m[1]);
+  };
+  const before = await colorsOf(tpl("minutes"));
+  assert.ok(before.some(isRedColor), "서식에 빨간 글자가 있어야 시험이 의미가 있어요");
+  const bytes = await docs.buildMinutes(tpl("minutes"), {
+    year: 2027, semester: 1, subjectArea: "과학", exam: 1, dateText: "2027년 4월 14일 수요일 15시 30분", place: "화학실",
+    attendees: "가, 나", recorder: "나", rows: [], remarks: "",
+  });
+  const after = await colorsOf(bytes);
+  assert.equal(after.length, before.length, "글자 서식의 개수는 그대로");
+  assert.ok(!after.some(isRedColor), "빨간 글자가 남아 있어요");
+  // 빨갛지 않던 색은 바뀌지 않는다
+  assert.deepEqual(after.filter((c) => !before.includes(c) && c !== "#000000"), []);
+  const kept = before.filter((c) => !isRedColor(c));
+  assert.deepEqual(after.filter((c, i) => !isRedColor(before[i])), kept);
+  // 다른 서식(산출 안내)은 건드리지 않는다: 강조용 빨간 글자가 그대로 있다
+  const guide = await docs.buildGuide("first", tpl("guide-1st"), { year: 2027, semester: 1, aRatioLimit: "23.9" });
+  assert.ok((await colorsOf(guide)).some(isRedColor), "산출 안내의 강조 표시는 그대로여야 해요");
+});
+

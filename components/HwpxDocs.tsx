@@ -365,7 +365,7 @@ export function GuideSection({ term }: { term: Term }) {
                   .map((r) => Object.fromEntries(ROW_FIELDS.map(([k]) => [k, r[k]])) as MinutesRow),
                 remarks,
               });
-              saveFile(bytes, safeName(`${area.trim()}과 회의록(${year}학년도 ${semester}학기 ${exam}차 정기시험).hwpx`));
+              saveFile(bytes, safeName(`${area.trim()} 교과협의록(${year}학년도 ${semester}학기 ${exam}차 정기시험).hwpx`));
             })
           }
         >
