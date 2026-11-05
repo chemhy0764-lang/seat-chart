@@ -64,6 +64,10 @@ const resolveDate = (date: string) => {
 
 // ───────── 분할점수 안내 ─────────
 
+/** 교과협의록의 교과 선택 목록. 목록에 없으면 '직접 입력'을 고른다. */
+const AREAS = ["국어", "수학", "영어", "사회", "과학", "체육", "음악", "미술", "기술·가정", "정보", "제2외국어", "한문", "교양"];
+const OTHER_AREA = "직접 입력";
+
 const EMPTY_ROW: MinutesRow = { grade: "", subject: "", writer: "", reviewer: "", exam: "1, 2차", method: "추정분할", levels: "5", average: "" };
 const ROW_FIELDS: [keyof MinutesRow, string, string][] = [
   ["grade", "학년", "w-12"],
@@ -82,7 +86,9 @@ export function GuideSection({ term }: { term: Term }) {
   const guide = useRunner();
   const minutes = useRunner();
 
-  const [area, setArea] = useState("");
+  const [areaChoice, setAreaChoice] = useState("");
+  const [customArea, setCustomArea] = useState("");
+  const area = areaChoice === OTHER_AREA ? customArea : areaChoice;
   const [exam, setExam] = useState<1 | 2>(1);
   const [date, setDate] = useState("");
   const [time, setTime] = useState("15:30");
@@ -143,8 +149,22 @@ export function GuideSection({ term }: { term: Term }) {
         <div className="grid gap-2 text-sm sm:grid-cols-2">
           <label className="flex items-center gap-2">
             교과
-            <input className={`${field} flex-1`} placeholder="예: 과학" value={area} onChange={(e) => setArea(e.target.value)} />
+            <select className={`${field} flex-1`} value={areaChoice} onChange={(e) => setAreaChoice(e.target.value)}>
+              <option value="">교과를 선택하세요</option>
+              {AREAS.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+              <option value={OTHER_AREA}>{OTHER_AREA}</option>
+            </select>
           </label>
+          {areaChoice === OTHER_AREA && (
+            <label className="flex items-center gap-2">
+              교과 이름
+              <input className={`${field} flex-1`} placeholder="예: 진로" value={customArea} onChange={(e) => setCustomArea(e.target.value)} />
+            </label>
+          )}
           <label className="flex items-center gap-2">
             시험
             <select className={field} value={exam} onChange={(e) => setExam(Number(e.target.value) as 1 | 2)}>
@@ -224,7 +244,7 @@ export function GuideSection({ term }: { term: Term }) {
         >
           교과협의록 내려받기
         </button>
-        {area.trim() === "" && <p className="text-xs text-gray-500">교과 이름을 입력하면 내려받을 수 있어요.</p>}
+        {area.trim() === "" && <p className="text-xs text-gray-500">교과를 선택하면 내려받을 수 있어요.</p>}
         <Message message={minutes.message} />
         <p className="text-xs text-gray-500">입력한 이름과 내용은 서버에 저장되지 않고, 이 화면에서 파일로만 만들어져요.</p>
       </section>
