@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import {
   DndContext,
@@ -174,6 +175,9 @@ export default function SeatEditor({
         <header className="flex flex-wrap items-center justify-between gap-2">
           <h1 className="text-2xl font-bold">자리 배치표</h1>
           <div className="flex items-center gap-3 text-sm text-gray-600">
+            <Link href="/cutoff" className="rounded-md border border-gray-300 bg-white px-3 py-1.5">
+              분할점수 점검
+            </Link>
             <span>{email}</span>
             <form action="/auth/signout" method="post">
               <button className="rounded-md border border-gray-300 bg-white px-3 py-1.5">
