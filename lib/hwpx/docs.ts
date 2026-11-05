@@ -158,9 +158,18 @@ function fillTables(pkg: Pkg, o: NoticeOptions): Element[] {
   const tables = tablesOf(doc);
   const perf = o.kind === "perf";
   // 표 순서: 0 머리글, 1 제목, 2·3·4 학년별 자료(수행평가는 2·3학년 표만 있다), 마지막 날짜·직인
-  const targets = perf ? [tables[2], tables[3]] : [tables[2], tables[3], tables[4]];
+  // 3학년 자료가 없으면(3학년은 추정분할 교과가 없는 해가 있다) 1차·2차의 3학년 제목과 표를 문서에서 뺀다.
+  // 3학년 칸은 제목, 빈 줄, 표 순서로 세 문단이다.
+  const noThird = !perf && !o.grades.some((x) => x.grade === 3 && x.groups.length > 0);
+  if (noThird) {
+    const root = doc.documentElement;
+    const paras = children(root, "p");
+    const at = paras.indexOf(paragraphOf(tables[4]));
+    for (const p of paras.slice(at - 2, at + 1)) root.removeChild(p);
+  }
+  const targets = perf ? [tables[2], tables[3]] : noThird ? [tables[2], tables[3]] : [tables[2], tables[3], tables[4]];
   const families = perf ? [PERF5, PERF4] : o.kind === "term" ? [T12, T10, T10] : [F5, F4, F4];
-  const sources = perf ? [tables[2], tables[3]] : [tables[2], tables[3], tables[3]];
+  const sources = perf ? [tables[2], tables[3]] : noThird ? [tables[2], tables[3]] : [tables[2], tables[3], tables[3]];
   // 서식 표는 바꾸기 전 복사본에서 본뜬다.
   const frozen = sources.map((t) => t.cloneNode(true) as Element);
   return targets.map((target, i) => {
@@ -236,7 +245,7 @@ export async function buildMeeting(data: ArrayBuffer | Uint8Array, o: Omit<Notic
   const paras = children(root, "p");
   const index = (el: Element) => paras.indexOf(paragraphOf(el));
   const firstTable = index(made[0]);
-  const lastTable = index(made[2]);
+  const lastTable = index(made[made.length - 1]);
   const heading = firstTable - 2;
 
   // 첫 문단: 쪽 설정(secPr)이 든 run은 두고, 머리글 표와 그림이 든 run만 지운다.
