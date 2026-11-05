@@ -14,6 +14,8 @@ import {
   type Term,
 } from "@/lib/hwpx/docs";
 import { loadTemplate, safeName, saveFile } from "@/lib/hwpx/client";
+import { latestPlan } from "@/lib/plans/api";
+import { examValueFor } from "@/lib/plans/exams";
 import { AREAS, OTHER as OTHER_AREA, subjectsFor } from "@/lib/subjects";
 
 const box = "space-y-3 rounded-xl bg-white p-4 shadow-sm ring-1 ring-black/5";
@@ -108,10 +110,33 @@ export function GuideSection({ term }: { term: Term }) {
   const setRow = (i: number, key: keyof MinutesRow, value: string) =>
     setRows(rows.map((r, n) => (n === i ? { ...r, [key]: value } : r)));
   const subjects = subjectsFor(area);
+  const [planNote, setPlanNote] = useState<{ ok: boolean; text: string } | null>(null);
+  /** 올린 협의록에서 장소·참석자·기록자를 불러온다. overwrite가 false면 비어 있는 칸만 채운다. */
+  async function loadMinutes(name: string, overwrite: boolean) {
+    setPlanNote(null);
+    try {
+      const plan = await latestPlan("minutes", name, year, semester, "", true);
+      if (!plan) {
+        setPlanNote({ ok: false, text: `${name} 교과로 올라온 협의록이 없어요. '자료 첨부' 탭에서 관리자가 올리면 여기서 불러와요.` });
+        return;
+      }
+      const p = plan.parsed as { place?: string; attendees?: string; recorder?: string };
+      if (overwrite || place.trim() === "") setPlace(p.place ?? "");
+      if (overwrite || attendees.trim() === "") setAttendees(p.attendees ?? "");
+      if (overwrite || recorder.trim() === "") setRecorder(p.recorder ?? "");
+      setPlanNote({
+        ok: true,
+        text: `올린 협의록(${plan.year}학년도 ${plan.semester}학기 ${plan.version}판)에서 장소·참석자·기록자를 불러왔어요. 확인하고 필요하면 고쳐 쓰세요.`,
+      });
+    } catch (e) {
+      setPlanNote({ ok: false, text: e instanceof Error ? e.message : "협의록을 불러오지 못했어요." });
+    }
+  }
   // 교과를 바꾸면 목록에서 고른 과목은 비운다(직접 입력한 과목은 둔다).
   const changeArea = (value: string) => {
     setAreaChoice(value);
     setRows(rows.map((r) => (r.custom ? r : { ...r, subject: "" })));
+    if (value && value !== OTHER_AREA) void loadMinutes(value, false);
   };
   const pickSubject = (i: number, value: string) =>
     setRows(rows.map((r, n) => (n === i ? (value === OTHER_AREA ? { ...r, custom: true, subject: "" } : { ...r, custom: false, subject: value }) : r)));
@@ -209,6 +234,20 @@ export function GuideSection({ term }: { term: Term }) {
             <input className={`${field} flex-1`} value={remarks} onChange={(e) => setRemarks(e.target.value)} />
           </label>
         </div>
+
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <button
+            className="rounded-md border border-gray-300 bg-white px-3 py-1"
+            disabled={areaChoice === "" || areaChoice === OTHER_AREA}
+            onClick={() => loadMinutes(areaChoice, true)}
+          >
+            올린 협의록에서 장소·참석자·기록자 불러오기
+          </button>
+          <span className="text-xs text-gray-500">교과를 고르면 비어 있는 칸은 자동으로 채워요.</span>
+        </div>
+        {planNote && (
+          <p className={`rounded-md p-2 text-sm ${planNote.ok ? "bg-emerald-50 text-emerald-900" : "bg-amber-50 text-amber-900"}`}>{planNote.text}</p>
+        )}
 
         <div className="space-y-1 overflow-x-auto">
           <p className="text-sm font-semibold">과목별 출제·검토 교사와 분할점수 산출 여부</p>
@@ -357,6 +396,41 @@ export function NoticeSection({ term }: { term: Term }) {
   const meeting = useRunner();
 
   const info = KINDS.find((k) => k.key === kind)!;
+  const [planNote, setPlanNote] = useState<{ ok: boolean; text: string } | null>(null);
+  const [planBusy, setPlanBusy] = useState(false);
+  /** 관리자가 올린 학년별 추정분할점수에서 세 학년의 칸을 채운다(이미 쓴 내용은 덮어쓴다). */
+  async function loadPlans() {
+    setPlanBusy(true);
+    setPlanNote(null);
+    try {
+      const exam = examValueFor(kind);
+      const found: string[] = [];
+      const missing: string[] = [];
+      const next = { ...texts[kind] };
+      for (const g of [1, 2, 3] as const) {
+        const plan = await latestPlan("cutoffs", String(g), year, semester, exam);
+        const text = plan ? String((plan.parsed as { text?: string }).text ?? "") : "";
+        if (plan && text.trim() !== "") {
+          next[g] = text;
+          found.push(`${g}학년 ${plan.version}판`);
+        } else {
+          missing.push(`${g}학년`);
+        }
+      }
+      setTexts({ ...texts, [kind]: next });
+      setPlanNote({
+        ok: found.length > 0,
+        text:
+          found.length > 0
+            ? `${year}학년도 ${semester}학기 ${info.label} 자료를 불러왔어요: ${found.join(", ")}.${missing.length ? ` 올라온 자료가 없는 학년: ${missing.join(", ")}.` : ""}`
+            : `${year}학년도 ${semester}학기 ${info.label}로 올라온 추정분할점수 자료가 없어요. '자료 첨부' 탭에서 관리자가 올리면 여기서 불러와요.`,
+      });
+    } catch (e) {
+      setPlanNote({ ok: false, text: e instanceof Error ? e.message : "자료를 불러오지 못했어요." });
+    } finally {
+      setPlanBusy(false);
+    }
+  }
   const grades = ([1, 2, 3] as const).map((grade) => {
     const parsed = parseCutoffText(texts[kind][grade], kind === "perf" ? 1 : 0, valueCountFor(kind, grade));
     const empty = texts[kind][grade].trim() === "";
@@ -399,6 +473,15 @@ export function NoticeSection({ term }: { term: Term }) {
           학년별로 엑셀에서 복사해 붙여넣으세요. 한 줄에 {info.hint}를 쓰고, <b>추정</b> 또는 <b>고정</b>이라고만 쓴 줄로 묶음을
           나눠요. 값이 없는 칸은 - 나 · 를 쓰세요.
         </p>
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <button className="rounded-md border border-gray-300 bg-white px-3 py-1" disabled={planBusy} onClick={loadPlans}>
+            올린 추정분할점수 자료에서 불러오기
+          </button>
+          <span className="text-xs text-gray-500">세 학년 칸을 한 번에 채워요. 불러온 뒤 고쳐 쓸 수 있어요.</span>
+        </div>
+        {planNote && (
+          <p className={`rounded-md p-2 text-sm ${planNote.ok ? "bg-emerald-50 text-emerald-900" : "bg-amber-50 text-amber-900"}`}>{planNote.text}</p>
+        )}
         {grades.map(({ grade, parsed, empty }) => (
           <div key={grade} className="space-y-1">
             <label className="text-sm font-semibold" htmlFor={`g${grade}`}>
