@@ -24,7 +24,7 @@ test("교과로 과목 목록을 찾는다", () => {
   assert.ok(subjectsFor("수학").includes("공통수학1"));
   assert.ok(subjectsFor("예체능").includes("체육1") && subjectsFor("예체능").includes("음악") && subjectsFor("예체능").includes("미술"));
   assert.ok(subjectsFor("제2외국어·한문").includes("일본어Ⅰ") && subjectsFor("제2외국어·한문").includes("한문Ⅰ"));
-  assert.deepEqual(subjectsFor("교양"), []);
+  assert.deepEqual(subjectsFor("교양"), ["인간과 심리", "인공지능 수학"]);
   assert.deepEqual(subjectsFor("직접 입력"), []);
   assert.deepEqual(subjectsFor(""), []);
 });
