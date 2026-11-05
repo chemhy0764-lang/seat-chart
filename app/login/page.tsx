@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { describeAuthError } from "@/lib/authErrors";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -21,7 +22,7 @@ export default function LoginPage() {
     if (mode === "signin") {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
-        setMessage("이메일 또는 비밀번호가 맞지 않거나, 아직 이메일 확인을 하지 않았어요.");
+        setMessage(describeAuthError(error, "signin"));
       } else {
         router.replace("/");
         router.refresh();
@@ -33,7 +34,11 @@ export default function LoginPage() {
         options: { emailRedirectTo: `${window.location.origin}/login` },
       });
       if (error) {
-        setMessage(`가입하지 못했어요: ${error.message}`);
+        setMessage(describeAuthError(error, "signup"));
+      } else if (data.user && data.user.identities?.length === 0) {
+        // 이미 가입된 이메일이면 Supabase는 오류 없이 이메일을 보내지 않고 돌려준다.
+        setMessage("이미 가입된 이메일이에요. 비밀번호를 입력해 로그인해 주세요.");
+        setMode("signin");
       } else if (data.session) {
         router.replace("/");
         router.refresh();
