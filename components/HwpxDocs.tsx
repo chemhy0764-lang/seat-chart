@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { parseCutoffText } from "@/lib/hwpx/data";
 import {
   buildGuide,
@@ -112,45 +112,52 @@ export function GuideSection({ term }: { term: Term }) {
     setRows(rows.map((r, n) => (n === i ? { ...r, [key]: value } : r)));
   const subjects = subjectsFor(area);
   const [planNote, setPlanNote] = useState<{ ok: boolean; text: string } | null>(null);
-  /** 올린 협의록에서 장소·참석자·기록자를 불러온다. overwrite가 false면 비어 있는 칸만 채운다. */
-  async function loadMinutes(name: string, overwrite: boolean) {
-    setPlanNote(null);
-    try {
-      const plan = await latestPlan("minutes", name, year, semester, "", true);
-      if (!plan) {
-        setPlanNote({ ok: false, text: `${name} 교과로 올라온 협의록이 없어요. '자료 첨부' 탭에서 관리자가 올리면 여기서 불러와요.` });
-        return;
+  // 교과(또는 학기)를 고르면 올린 협의록에서 장소·참석자·기록자와 과목 줄을 자동으로 채운다. 따로 누를 버튼은 없다.
+  useEffect(() => {
+    if (!areaChoice || areaChoice === OTHER_AREA) return;
+    let alive = true;
+    (async () => {
+      try {
+        const plan = await latestPlan("minutes", areaChoice, year, semester, "", true);
+        if (!alive) return;
+        if (!plan) {
+          setPlanNote({ ok: false, text: `${areaChoice} 교과로 올라온 협의록이 없어요. '자료 첨부' 탭에서 관리자가 올리면 여기에 자동으로 채워져요.` });
+          return;
+        }
+        const p = plan.parsed as { place?: string; attendees?: string; recorder?: string; subjects?: SubjectPlan[] };
+        setPlace(p.place ?? "");
+        setAttendees(p.attendees ?? "");
+        setRecorder(p.recorder ?? "");
+        const subs = Array.isArray(p.subjects) ? p.subjects : [];
+        if (subs.length > 0) {
+          const hasList = subjectsFor(areaChoice).length > 0;
+          setRows(
+            subs.map((sp) => {
+              const c = canonicalSubject(sp.subject, areaChoice);
+              return { ...EMPTY_ROW, grade: sp.grade, subject: c.name, exam: examValueOf(sp), method: sp.method, custom: hasList && !c.inList };
+            }),
+          );
+        }
+        setPlanNote({
+          ok: true,
+          text: `올린 협의록(${plan.year}학년도 ${plan.semester}학기 ${plan.version}판)에서 장소·참석자·기록자${subs.length > 0 ? `와 과목 ${subs.length}개` : ""}를 채웠어요. 확인하고 필요하면 고쳐 쓰세요.`,
+        });
+      } catch (e) {
+        if (alive) setPlanNote({ ok: false, text: e instanceof Error ? e.message : "협의록을 불러오지 못했어요." });
       }
-      const p = plan.parsed as { place?: string; attendees?: string; recorder?: string; subjects?: SubjectPlan[] };
-      if (overwrite || place.trim() === "") setPlace(p.place ?? "");
-      if (overwrite || attendees.trim() === "") setAttendees(p.attendees ?? "");
-      if (overwrite || recorder.trim() === "") setRecorder(p.recorder ?? "");
-      // 과목 줄은 아직 아무것도 채우지 않았을 때(또는 덮어쓰기 버튼) 올린 협의록의 반영 비율 표로 채운다.
-      const subs = Array.isArray(p.subjects) ? p.subjects : [];
-      const untouched = rows.every((r) => ROW_FIELDS.every(([k]) => r[k].trim() === "" || r[k] === EMPTY_ROW[k]));
-      const fillRows = subs.length > 0 && (overwrite || untouched);
-      if (fillRows) {
-        const hasList = subjectsFor(name).length > 0;
-        setRows(
-          subs.map((sp) => {
-            const c = canonicalSubject(sp.subject, name);
-            return { ...EMPTY_ROW, grade: sp.grade, subject: c.name, exam: examValueOf(sp), method: sp.method, custom: hasList && !c.inList };
-          }),
-        );
-      }
-      setPlanNote({
-        ok: true,
-        text: `올린 협의록(${plan.year}학년도 ${plan.semester}학기 ${plan.version}판)에서 장소·참석자·기록자${fillRows ? `와 과목 ${subs.length}개` : ""}를 불러왔어요. 확인하고 필요하면 고쳐 쓰세요.`,
-      });
-    } catch (e) {
-      setPlanNote({ ok: false, text: e instanceof Error ? e.message : "협의록을 불러오지 못했어요." });
-    }
-  }
-  // 교과를 바꾸면 목록에서 고른 과목은 비운다(직접 입력한 과목은 둔다).
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [areaChoice, year, semester]);
+  // 교과를 바꾸면 이전 교과의 장소·참석자·기록자·과목 줄을 비운다(올린 협의록이 있으면 곧바로 새로 채워진다).
   const changeArea = (value: string) => {
     setAreaChoice(value);
-    setRows(rows.map((r) => (r.custom ? r : { ...r, subject: "" })));
-    if (value && value !== OTHER_AREA) void loadMinutes(value, false);
+    setPlanNote(null);
+    setPlace("");
+    setAttendees("");
+    setRecorder("");
+    setRows([blankRow()]);
   };
   const pickSubject = (i: number, value: string) =>
     setRows(rows.map((r, n) => (n === i ? (value === OTHER_AREA ? { ...r, custom: true, subject: "" } : { ...r, custom: false, subject: value }) : r)));
@@ -249,16 +256,7 @@ export function GuideSection({ term }: { term: Term }) {
           </label>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 text-sm">
-          <button
-            className="rounded-md border border-gray-300 bg-white px-3 py-1"
-            disabled={areaChoice === "" || areaChoice === OTHER_AREA}
-            onClick={() => loadMinutes(areaChoice, true)}
-          >
-            올린 협의록에서 장소·참석자·기록자·과목 불러오기
-          </button>
-          <span className="text-xs text-gray-500">교과를 고르면 비어 있는 칸은 자동으로 채워요.</span>
-        </div>
+        <p className="text-xs text-gray-500">교과를 고르면 올린 협의록에서 장소·참석자·기록자·과목이 자동으로 채워져요.</p>
         {planNote && (
           <p className={`rounded-md p-2 text-sm ${planNote.ok ? "bg-emerald-50 text-emerald-900" : "bg-amber-50 text-amber-900"}`}>{planNote.text}</p>
         )}
