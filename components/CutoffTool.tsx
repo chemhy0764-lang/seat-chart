@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import { GuideSection, NoticeSection } from "@/components/HwpxDocs";
 import CurriculumFiles from "@/components/CurriculumFiles";
 import PlanFiles from "@/components/PlanFiles";
+import { fetchIsAdmin } from "@/lib/plans/api";
 import { YEARS, type Semester } from "@/lib/hwpx/docs";
 import {
   LEVELS,
@@ -30,15 +32,49 @@ export default function CutoffTool() {
   const [section, setSection] = useState<Section>("guide");
   const [year, setYear] = useState<number>(YEARS[0]);
   const [semester, setSemester] = useState<Semester>(1);
+  // 관리자(admins 표에 있는 계정)만 점검 도구, 편제표, 자료 첨부를 본다. 로그인하지 않은 방문자는 안내와 공지만 쓴다.
+  const [admin, setAdmin] = useState<boolean | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetchIsAdmin().then(
+      (v) => alive && setAdmin(v),
+      () => alive && setAdmin(false),
+    );
+    return () => {
+      alive = false;
+    };
+  }, []);
   const sections: [Section, string][] = [
     ["guide", "분할점수 안내"],
     ["notice", "분할점수 공지"],
-    ["check", "점검 도구"],
-    ["curriculum", "편제표"],
-    ["plans", "자료 첨부"],
+    ...(admin === true
+      ? ([
+          ["check", "점검 도구"],
+          ["curriculum", "편제표"],
+          ["plans", "자료 첨부"],
+        ] as [Section, string][])
+      : []),
   ];
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h1 className="text-2xl font-bold">분할점수</h1>
+        {admin === true && (
+          <div className="flex items-center gap-2 text-sm">
+            <Link href="/" className="rounded-md border border-gray-300 bg-white px-3 py-1.5">
+              자리 배치표로
+            </Link>
+            <form action="/auth/signout" method="post">
+              <button className="rounded-md border border-gray-300 bg-white px-3 py-1.5">로그아웃</button>
+            </form>
+          </div>
+        )}
+        {admin === false && (
+          <Link href="/login" className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm">
+            관리자 로그인
+          </Link>
+        )}
+      </div>
       <nav className="flex flex-wrap gap-2 border-b border-gray-200 pb-3">
         {sections.map(([key, label]) => (
           <button
@@ -78,10 +114,10 @@ export default function CutoffTool() {
         </div>
       )}
       {section === "guide" && <GuideSection term={{ year, semester }} />}
-      {section === "notice" && <NoticeSection term={{ year, semester }} />}
-      {section === "curriculum" && <CurriculumFiles term={{ year, semester }} />}
-      {section === "plans" && <PlanFiles term={{ year, semester }} />}
-      {section === "check" && <CheckTool />}
+      {section === "notice" && <NoticeSection term={{ year, semester }} admin={admin === true} />}
+      {admin === true && section === "curriculum" && <CurriculumFiles term={{ year, semester }} />}
+      {admin === true && section === "plans" && <PlanFiles term={{ year, semester }} />}
+      {admin === true && section === "check" && <CheckTool />}
     </div>
   );
 }

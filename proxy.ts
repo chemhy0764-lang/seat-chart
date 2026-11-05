@@ -29,10 +29,14 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isLoginPage = request.nextUrl.pathname.startsWith("/login");
-  if (!user && !isLoginPage) {
+  // 분할점수 페이지(/cutoff)는 링크만 있으면 로그인 없이 쓴다. 관리자 전용 탭은 화면에서 숨기고, 올리기는 DB 규칙(RLS)이 관리자만 허용한다.
+  // 자리 배치표(/)와 나머지는 로그인이 필요하고, 관리자가 아니면 /cutoff로 보낸다(app/page.tsx).
+  const path = request.nextUrl.pathname;
+  const isLoginPage = path.startsWith("/login");
+  const isPublic = isLoginPage || path === "/cutoff" || path.startsWith("/cutoff/");
+  if (!user && !isPublic) {
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
+    url.pathname = "/cutoff";
     url.search = "";
     return NextResponse.redirect(url);
   }
@@ -47,5 +51,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/keepalive|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/keepalive|hwpx/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
 };

@@ -56,6 +56,7 @@ before(async () => {
   `);
   await db.exec(readFileSync(new URL("../../supabase/migrations/20261105010000_plan_uploads.sql", import.meta.url), "utf8"));
   await db.exec(readFileSync(new URL("../../supabase/migrations/20261105020000_curriculum_uploads.sql", import.meta.url), "utf8"));
+  await db.exec(readFileSync(new URL("../../supabase/migrations/20261105030000_public_plan_read.sql", import.meta.url), "utf8"));
   await db.query("insert into public.admins (user_id) values ($1)", [ADMIN]);
 });
 
@@ -152,4 +153,20 @@ test("편제표(curriculum, hwp): 관리자만 올리고 로그인한 사용자�
   await rejects(() => db.query("insert into storage.objects (bucket_id, name) values ('plans', 'curriculum/c.exe')"));
   await as("authenticated", TEACHER);
   await rejects(() => db.query("insert into storage.objects (bucket_id, name) values ('plans', 'curriculum/d.hwp')"));
+});
+
+test("로그인하지 않은 방문자: 자료 값은 읽지만 올린 사람·파일 원본은 못 읽고, 올리거나 고칠 수 없다", async () => {
+  await as("authenticated", ADMIN);
+  await upload(9, "수학");
+  await as("anon");
+  const rows = (await db.query<{ scope: string; parsed: unknown }>("select scope, parsed from public.plan_uploads where kind = 'minutes'")).rows;
+  assert.ok(rows.length > 0, "방문자가 값을 읽어야 해요");
+  await rejects(() => db.query("select uploaded_by from public.plan_uploads"));
+  await rejects(() => db.query("select * from public.plan_uploads"));
+  await rejects(() => upload(10, "수학", ADMIN));
+  await rejects(() => db.query("update public.plan_uploads set note = 'x'"));
+  await rejects(() => db.query("delete from public.plan_uploads"));
+  await rejects(() => db.query("select * from public.admins"));
+  // 파일 저장소는 오류가 아니라 '보이는 행이 없음'으로 막힌다(RLS가 행을 걸러낸다).
+  assert.equal((await db.query<{ c: number }>("select count(*)::int c from storage.objects")).rows[0].c, 0);
 });

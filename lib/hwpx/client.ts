@@ -13,7 +13,7 @@ const NAMES: Record<keyof Templates, string> = {
 /** 저장소에 들어 있는 한글(hwpx) 서식 파일을 가져온다. */
 export async function loadTemplate(key: keyof Templates): Promise<Uint8Array> {
   const res = await fetch(`/hwpx/${NAMES[key]}.hwpx`);
-  if (!res.ok) throw new Error(`서식 파일을 가져오지 못했어요(${res.status}). 로그인이 풀렸다면 다시 로그인하세요.`);
+  if (!res.ok) throw new Error(`서식 파일을 가져오지 못했어요(${res.status}). 잠시 뒤 다시 시도해 주세요.`);
   return new Uint8Array(await res.arrayBuffer());
 }
 
