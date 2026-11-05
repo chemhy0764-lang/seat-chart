@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import DropZone from "@/components/DropZone";
 import { parseCutoffText } from "@/lib/hwpx/data";
 import { valueCountFor, type Term } from "@/lib/hwpx/docs";
 import { fetchIsAdmin, listPlans, savePlan, signedUrl, type PlanKind, type PlanRow } from "@/lib/plans/api";
@@ -136,17 +137,18 @@ function PlanSection({
   const label = (r: { scope: string; exam: string }) =>
     isMinutes ? r.scope : `${r.scope}학년 ${EXAMS.find((e) => e.value === r.exam)?.label ?? r.exam}`;
 
-  async function chooseFile(file: File | null) {
+  async function chooseFile(file: File | null, extra?: string) {
+    const lead = extra ? [extra] : [];
     set({ file });
-    setNotes([]);
+    setNotes(lead);
     if (!file) return;
     if (!fileTypeOf(file.name)) {
-      setNotes(["hwpx, xlsx, pdf 파일만 올릴 수 있어요."]);
+      setNotes([...lead, "hwpx, xlsx, pdf 파일만 올릴 수 있어요."]);
       set({ file: null });
       return;
     }
     const result = await extractFromFile(file.name, await file.arrayBuffer());
-    setNotes(result.warnings);
+    setNotes([...lead, ...result.warnings]);
     setForm((f) => ({
       ...f,
       file,
@@ -156,8 +158,14 @@ function PlanSection({
       text: result.cutoffText || f.text,
     }));
     if (isMinutes && result.minutes && !result.minutes.place && !result.minutes.attendees && !result.minutes.recorder && result.warnings.length === 0) {
-      setNotes(["파일에서 장소, 참석자, 기록자를 찾지 못했어요. 아래에 직접 입력해 주세요."]);
+      setNotes([...lead, "파일에서 장소, 참석자, 기록자를 찾지 못했어요. 아래에 직접 입력해 주세요."]);
     }
+  }
+
+  /** 끌어다 놓거나 고른 파일들. 한 번에 파일 하나만 쓴다. */
+  function receiveFiles(files: File[]) {
+    if (files.length === 0) return;
+    void chooseFile(files[0], files.length > 1 ? `파일이 ${files.length}개라 첫 번째 파일(${files[0].name})만 사용해요. 파일은 하나씩 올려 주세요.` : undefined);
   }
 
   function startCorrection(row: PlanRow) {
@@ -311,21 +319,13 @@ function PlanSection({
                 </label>
               </>
             )}
-            <label className="flex items-center gap-1">
-              파일
-              <input
-                type="file"
-                accept=".hwpx,.xlsx,.pdf"
-                className="max-w-60 text-xs"
-                onChange={(e) => chooseFile(e.target.files?.[0] ?? null)}
-              />
-            </label>
             {form.base && (
               <button className="text-gray-500 underline" onClick={() => setForm(blankForm(kind))}>
                 정정 취소
               </button>
             )}
           </div>
+          <DropZone file={form.file} accept=".hwpx,.xlsx,.pdf" hint="hwpx, xlsx, pdf · 한 번에 하나" onFiles={receiveFiles} />
           {form.base && !form.file && <p className="text-xs text-gray-500">새 파일을 고르지 않으면 {form.base.file_name} 파일은 그대로 두고 아래 값만 정정해요.</p>}
           {notes.map((n, i) => (
             <p key={i} className="rounded-md bg-amber-50 p-2 text-xs text-amber-900">
