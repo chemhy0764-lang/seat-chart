@@ -1,5 +1,8 @@
 -- 되돌리기는 위에서부터 순서대로 실행한다.
 
+-- 20261105000000_add_ping 되돌리기
+drop function if exists public.ping();
+
 -- 20261012010000_add_separations 되돌리기
 alter table public.seat_charts drop column if exists separations;
 
