@@ -91,6 +91,9 @@ const CHOICES: Partial<Record<keyof MinutesRow, string[]>> = {
   levels: ["5", "3"],
 };
 
+/** 3학년은 추정분할 교과가 없다. 기본값(추정분할) 그대로인 3학년 줄은 고정분할로 맞춘다. */
+const methodFor = (grade: string, method: string) => (grade === "3" && method === EMPTY_ROW.method ? "고정분할" : method);
+
 export function GuideSection({ term }: { term: Term }) {
   const { year, semester } = term;
   const [limit, setLimit] = useState("23.9");
@@ -146,7 +149,7 @@ export function GuideSection({ term }: { term: Term }) {
     let next = rows;
     if (filledArea.current !== areaChoice && rows.length === 1 && !rows[0].subject && !rows[0].grade) {
       const fromCurr: UiRow[] = ["1", "2", "3"].flatMap((g) =>
-        (curr[g] ?? []).filter((c) => c.area === areaChoice).map((c) => ({ ...EMPTY_ROW, grade: g, subject: c.subject, levels: c.levels || EMPTY_ROW.levels, custom: false, lv: `${g}|${c.subject}` })),
+        (curr[g] ?? []).filter((c) => c.area === areaChoice).map((c) => ({ ...EMPTY_ROW, grade: g, subject: c.subject, levels: c.levels || EMPTY_ROW.levels, method: methodFor(g, EMPTY_ROW.method), custom: false, lv: `${g}|${c.subject}` })),
       );
       if (fromCurr.length > 0) {
         next = fromCurr;
@@ -157,7 +160,7 @@ export function GuideSection({ term }: { term: Term }) {
       const c = findCourse(curr, r.grade, areaChoice, r.subject);
       const key = c ? `${r.grade}|${c.subject}` : "";
       if (!c || r.lv === key) return r;
-      return { ...r, subject: c.subject, custom: false, levels: c.levels || r.levels, lv: key };
+      return { ...r, subject: c.subject, custom: false, levels: c.levels || r.levels, method: methodFor(r.grade, r.method), lv: key };
     });
     if (next.length !== rows.length || next.some((r, i) => r !== rows[i])) setRows(next);
   }, [areaChoice, curr, hasCurr, rows]);
@@ -445,6 +448,8 @@ const PLACEHOLDER = (kind: NoticeKind, grade: number) => {
   const n = valueCountFor(kind, grade);
   const lead = kind === "perf" ? "\t52" : "";
   const vals = (base: number) => Array.from({ length: n }, (_, i) => base - i * 15).map((v) => Math.max(v, 0)).join("\t");
+  // 3학년은 추정분할 교과가 없고 모두 고정분할이다.
+  if (grade === 3) return `고정\n예시교과${lead}\t${vals(90)}`;
   return `추정\n예시교과1${lead}\t${vals(80)}\n고정\n예시교과2${lead}\t${vals(90)}`;
 };
 
