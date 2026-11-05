@@ -24,8 +24,12 @@ export type PlanRow = {
 const COLUMNS = "id, kind, scope, year, semester, exam, version, file_path, file_name, file_type, parsed, note, uploaded_at";
 const BUCKET = "plans";
 
-function explain(error: { code?: string; message?: string }): Error {
+/** 읽기에서 권한 오류가 나면 방문자에게 보이는 안내. 자료는 선택 사항이라 직접 입력해도 문서를 내려받을 수 있다. */
+export const READ_DENIED = "올라온 자료를 불러오지 못했어요. 값을 직접 입력해도 내려받을 수 있어요. 계속 이러면 관리자에게 알려 주세요(자료 읽기 설정이 아직 안 됐을 수 있어요).";
+
+function explain(error: { code?: string; message?: string }, action: "read" | "write" = "write"): Error {
   if (error.code === "42501" || /row-level security|permission denied/i.test(error.message ?? "")) {
+    if (action === "read") return new Error(READ_DENIED);
     return new Error("관리자만 자료를 올릴 수 있어요. 관리자로 등록된 계정으로 로그인했는지 확인하세요.");
   }
   if (error.code === "42P01" || /relation .* does not exist|schema cache/i.test(error.message ?? "")) {
@@ -51,7 +55,7 @@ export async function listPlans(kind: PlanKind, year: number, semester: number):
     .order("scope", { ascending: true })
     .order("exam", { ascending: true })
     .order("version", { ascending: false });
-  if (error) throw explain(error);
+  if (error) throw explain(error, "read");
   return (data ?? []) as PlanRow[];
 }
 
@@ -70,7 +74,7 @@ export async function latestPlan(
   const supabase = createClient();
   const base = () => supabase.from("plan_uploads").select(COLUMNS).eq("kind", kind).eq("scope", scope).eq("exam", exam);
   const exact = await base().eq("year", year).eq("semester", semester).order("version", { ascending: false }).limit(1);
-  if (exact.error) throw explain(exact.error);
+  if (exact.error) throw explain(exact.error, "read");
   const hit = ((exact.data ?? [])[0] as PlanRow | undefined) ?? null;
   if (hit || !fallback) return hit;
   const any = await base()
@@ -78,7 +82,7 @@ export async function latestPlan(
     .order("semester", { ascending: false })
     .order("version", { ascending: false })
     .limit(1);
-  if (any.error) throw explain(any.error);
+  if (any.error) throw explain(any.error, "read");
   return ((any.data ?? [])[0] as PlanRow | undefined) ?? null;
 }
 
