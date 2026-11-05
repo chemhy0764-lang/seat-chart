@@ -74,11 +74,18 @@ const ROW_FIELDS: [keyof MinutesRow, string, string][] = [
   ["subject", "과목명", "w-28"],
   ["writer", "출제교사", "w-28"],
   ["reviewer", "검토교사", "w-24"],
-  ["exam", "정기시험", "w-20"],
-  ["method", "산출방식", "w-24"],
-  ["levels", "단계", "w-12"],
+  ["exam", "정기시험", "w-24"],
+  ["method", "산출방식", "w-28"],
+  ["levels", "단계", "w-16"],
   ["average", "예상평균", "w-16"],
 ];
+
+/** 값이 정해져 있는 칸의 선택지. 학교 협의록에 나온 값이다('-'는 해당 없음). */
+const CHOICES: Partial<Record<keyof MinutesRow, string[]>> = {
+  exam: ["1, 2차", "1차", "2차", "-"],
+  method: ["추정분할", "고정분할", "-"],
+  levels: ["5", "3"],
+};
 
 export function GuideSection({ term }: { term: Term }) {
   const { year, semester } = term;
@@ -208,7 +215,21 @@ export function GuideSection({ term }: { term: Term }) {
           {rows.map((r, i) => (
             <div key={i} className="flex items-center gap-1 text-sm">
               {ROW_FIELDS.map(([key, label, w]) =>
-                key === "grade" ? (
+                CHOICES[key] ? (
+                  <select
+                    key={key}
+                    aria-label={label}
+                    className={`${field} ${w}`}
+                    value={r[key]}
+                    onChange={(e) => setRow(i, key, e.target.value)}
+                  >
+                    {CHOICES[key]!.map((v) => (
+                      <option key={v} value={v}>
+                        {v}
+                      </option>
+                    ))}
+                  </select>
+                ) : key === "grade" ? (
                   <select
                     key={key}
                     aria-label={label}
