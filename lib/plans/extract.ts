@@ -4,6 +4,7 @@
 import JSZip from "jszip";
 import { children, descendants, first, parseXml } from "../hwpx/dom.ts";
 import { paragraphText } from "../hwpx/text.ts";
+import { looksLikeNeis, neisTexts, parseNeisRows, type NeisTexts } from "./neis.ts";
 import { minutesFromPdf, readPdfPages, subjectsFromRows, type PdfJs, type SubjectPlan } from "./pdf.ts";
 
 export type FileType = "hwpx" | "pdf" | "xlsx";
@@ -163,9 +164,13 @@ export function cutoffTextFromRows(rows: string[][]): string {
 export type Extracted = {
   fileType: FileType;
   minutes: MinutesData | null;
+  /** 표 모양을 알 수 없는 파일에서 읽은 분할점수 표(붙여넣기 형식). 어느 시험인지는 모른다. */
   cutoffText: string | null;
-  /** 협의록 제목의 교과 이름과 협의 주제의 학년도·학기(PDF에서만 읽는다) */
+  /** NEIS '학기말 추정분할점수 전체교과목' 엑셀에서 읽은 시험별 분할점수 표 */
+  cutoffTexts: NeisTexts | null;
+  /** 협의록 제목의 교과 이름, NEIS 표의 학년, 그리고 학년도·학기(PDF와 NEIS 엑셀에서 읽는다) */
   area: string;
+  grade: number | null;
   year: number | null;
   semester: number | null;
   warnings: string[];
@@ -182,7 +187,7 @@ export async function extractFromFile(
 ): Promise<Extracted> {
   const fileType = fileTypeOf(name);
   if (!fileType) throw new Error("hwpx, xlsx, pdf 파일만 올릴 수 있어요.");
-  const result: Extracted = { fileType, minutes: null, cutoffText: null, area: "", year: null, semester: null, warnings: [] };
+  const result: Extracted = { fileType, minutes: null, cutoffText: null, cutoffTexts: null, area: "", grade: null, year: null, semester: null, warnings: [] };
   try {
     if (fileType === "hwpx") {
       const tables = await readHwpxTables(bytes);
@@ -192,7 +197,16 @@ export async function extractFromFile(
     } else if (fileType === "xlsx") {
       const rows = await readXlsxRows(bytes);
       result.minutes = { ...minutesFromRows(rows), subjects: subjectsFromRows(rows) };
-      result.cutoffText = cutoffTextFromRows(rows);
+      if (looksLikeNeis(rows)) {
+        const table = parseNeisRows(rows);
+        result.cutoffTexts = neisTexts(table);
+        result.grade = table.grade;
+        result.year = table.year;
+        result.semester = table.semester;
+        if (table.subjects.length === 0) result.warnings.push("NEIS 표에서 과목을 찾지 못했어요.");
+      } else {
+        result.cutoffText = cutoffTextFromRows(rows);
+      }
     } else {
       const pdfjs = options.pdfjs ?? (await (await import("./pdf-browser.ts")).loadPdfjs());
       const m = minutesFromPdf(await readPdfPages(bytes, pdfjs));

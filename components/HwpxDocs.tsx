@@ -17,7 +17,6 @@ import { loadTemplate, safeName, saveFile } from "@/lib/hwpx/client";
 import { latestPlan } from "@/lib/plans/api";
 import type { SubjectPlan } from "@/lib/plans/pdf";
 import { examValueOf } from "@/lib/plans/subjectsText";
-import { examValueFor } from "@/lib/plans/exams";
 import { AREAS, OTHER as OTHER_AREA, canonicalSubject, subjectsFor } from "@/lib/subjects";
 
 const box = "space-y-3 rounded-xl bg-white p-4 shadow-sm ring-1 ring-black/5";
@@ -418,13 +417,12 @@ export function NoticeSection({ term }: { term: Term }) {
     setPlanBusy(true);
     setPlanNote(null);
     try {
-      const exam = examValueFor(kind);
       const found: string[] = [];
       const missing: string[] = [];
       const next = { ...texts[kind] };
       for (const g of [1, 2, 3] as const) {
-        const plan = await latestPlan("cutoffs", String(g), year, semester, exam);
-        const text = plan ? String((plan.parsed as { text?: string }).text ?? "") : "";
+        const plan = await latestPlan("cutoffs", String(g), year, semester);
+        const text = plan ? String(((plan.parsed as { texts?: Partial<Record<NoticeKind, string>> }).texts ?? {})[kind] ?? "") : "";
         if (plan && text.trim() !== "") {
           next[g] = text;
           found.push(`${g}학년 ${plan.version}판`);
