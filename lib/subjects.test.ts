@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { AREAS, OTHER, SUBJECTS_BY_AREA, subjectsFor } from "./subjects.ts";
+import { AREAS, OTHER, SUBJECTS_BY_AREA, canonicalSubject, matchArea, subjectsFor } from "./subjects.ts";
 
 test("모든 교과에 과목 목록 항목이 있다", () => {
   assert.deepEqual(Object.keys(SUBJECTS_BY_AREA).sort(), [...AREAS].sort());
@@ -28,3 +28,22 @@ test("교과로 과목 목록을 찾는다", () => {
   assert.deepEqual(subjectsFor("직접 입력"), []);
   assert.deepEqual(subjectsFor(""), []);
 });
+
+test("올린 협의록의 교과 이름을 교과 목록에 맞춘다", () => {
+  assert.equal(matchArea("사회"), "사회");
+  assert.equal(matchArea("제2외국어, 한문"), "제2외국어·한문");
+  assert.equal(matchArea("기술·가정"), "기술·가정");
+  assert.equal(matchArea("인간과 심리"), "교양"); // 교양 과목 이름이 제목에 쓰인 경우
+  assert.equal(matchArea("없는 교과"), "");
+  assert.equal(matchArea(""), "");
+});
+
+test("올린 협의록의 과목 이름을 목록의 표기에 맞춘다", () => {
+  assert.deepEqual(canonicalSubject("영어II", "영어"), { name: "영어Ⅱ", inList: true });
+  assert.deepEqual(canonicalSubject("심화 영어I", "영어"), { name: "심화 영어Ⅰ", inList: true });
+  assert.deepEqual(canonicalSubject("확률과통계", "수학"), { name: "확률과 통계", inList: true });
+  assert.deepEqual(canonicalSubject("한국근현대사", "사회"), { name: "한국근·현대사", inList: true });
+  assert.deepEqual(canonicalSubject("일본어회화", "제2외국어·한문"), { name: "일본어 회화", inList: true });
+  assert.deepEqual(canonicalSubject("없는과목", "수학"), { name: "없는과목", inList: false });
+});
+

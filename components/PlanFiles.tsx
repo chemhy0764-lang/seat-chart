@@ -7,7 +7,9 @@ import { valueCountFor, type Term } from "@/lib/hwpx/docs";
 import { fetchIsAdmin, listPlans, savePlan, signedUrl, type PlanKind, type PlanRow } from "@/lib/plans/api";
 import { EXAMS } from "@/lib/plans/exams";
 import { extractFromFile, fileTypeOf } from "@/lib/plans/extract";
-import { AREAS } from "@/lib/subjects";
+import type { SubjectPlan } from "@/lib/plans/pdf";
+import { parseSubjectsText, subjectsToText } from "@/lib/plans/subjectsText";
+import { AREAS, matchArea } from "@/lib/subjects";
 
 const box = "space-y-3 rounded-xl bg-white p-4 shadow-sm ring-1 ring-black/5";
 const field = "rounded-md border border-gray-300 px-2 py-1";
@@ -74,8 +76,13 @@ const when = (iso: string) => {
 
 function summary(row: PlanRow): string {
   if (row.kind === "minutes") {
-    const p = row.parsed as { place?: string; attendees?: string; recorder?: string };
-    return [p.place && `장소 ${p.place}`, p.recorder && `기록자 ${p.recorder}`, p.attendees && `참석자 ${p.attendees.split(",").length}명`]
+    const p = row.parsed as { place?: string; attendees?: string; recorder?: string; subjects?: SubjectPlan[] };
+    return [
+      p.place && `장소 ${p.place}`,
+      p.recorder && `기록자 ${p.recorder}`,
+      p.attendees && `참석자 ${p.attendees.split(",").length}명`,
+      p.subjects?.length ? `과목 ${p.subjects.length}개` : "",
+    ]
       .filter(Boolean)
       .join(" · ");
   }
@@ -90,6 +97,8 @@ type Form = {
   place: string;
   attendees: string;
   recorder: string;
+  /** 협의록의 과목별 반영 비율 표(고칠 수 있는 글자 모양) */
+  subjectsText: string;
   text: string;
   note: string;
   base: PlanRow | null;
@@ -102,6 +111,7 @@ const blankForm = (kind: PlanKind): Form => ({
   place: "",
   attendees: "",
   recorder: "",
+  subjectsText: "",
   text: "",
   note: "",
   base: null,
@@ -133,6 +143,7 @@ function PlanSection({
   const parsedText = !isMinutes && examInfo
     ? parseCutoffText(form.text, examInfo.kind === "perf" ? 1 : 0, valueCountFor(examInfo.kind, Number(form.scope)))
     : null;
+  const parsedSubjects = isMinutes ? parseSubjectsText(form.subjectsText) : null;
   const hasPrevious = rows.some((r) => r.scope === form.scope && r.exam === form.exam);
   const label = (r: { scope: string; exam: string }) =>
     isMinutes ? r.scope : `${r.scope}학년 ${EXAMS.find((e) => e.value === r.exam)?.label ?? r.exam}`;
@@ -148,18 +159,37 @@ function PlanSection({
       return;
     }
     const result = await extractFromFile(file.name, await file.arrayBuffer());
-    setNotes([...lead, ...result.warnings]);
+    const found = [...lead, ...result.warnings];
+    let scope: string | undefined;
+    if (isMinutes && result.area) {
+      const area = matchArea(result.area);
+      if (area) {
+        scope = area;
+        found.push(`파일 제목의 교과 '${result.area}'를 '${area}'(으)로 읽어 선택했어요. 맞는지 확인하세요.`);
+      } else {
+        found.push(`파일 제목의 교과 '${result.area}'를 목록에서 찾지 못했어요. 교과를 직접 선택하세요.`);
+      }
+    }
+    if (isMinutes && result.year && result.semester && (result.year !== year || result.semester !== semester)) {
+      found.push(`파일은 ${result.year}학년도 ${result.semester}학기 자료로 보여요. 위에서 고른 ${year}학년도 ${semester}학기와 달라요. 학기를 맞춘 뒤 올려 주세요.`);
+    }
+    if (!isMinutes && result.fileType === "pdf") {
+      found.push("PDF의 분할점수 표는 아직 자동으로 읽지 못해요. 아래에 직접 붙여넣어 주세요(xlsx, hwpx는 읽어요).");
+    }
+    if (isMinutes && result.minutes && !result.minutes.place && !result.minutes.attendees && !result.minutes.recorder && result.warnings.length === 0) {
+      found.push("파일에서 장소, 참석자, 기록자를 찾지 못했어요. 아래에 직접 입력해 주세요.");
+    }
+    setNotes(found);
     setForm((f) => ({
       ...f,
       file,
+      scope: f.base ? f.scope : (scope ?? f.scope),
       place: result.minutes?.place || f.place,
       attendees: result.minutes?.attendees || f.attendees,
       recorder: result.minutes?.recorder || f.recorder,
+      subjectsText: result.minutes?.subjects?.length ? subjectsToText(result.minutes.subjects) : f.subjectsText,
       text: result.cutoffText || f.text,
     }));
-    if (isMinutes && result.minutes && !result.minutes.place && !result.minutes.attendees && !result.minutes.recorder && result.warnings.length === 0) {
-      setNotes([...lead, "파일에서 장소, 참석자, 기록자를 찾지 못했어요. 아래에 직접 입력해 주세요."]);
-    }
   }
 
   /** 끌어다 놓거나 고른 파일들. 한 번에 파일 하나만 쓴다. */
@@ -169,7 +199,7 @@ function PlanSection({
   }
 
   function startCorrection(row: PlanRow) {
-    const p = row.parsed as { place?: string; attendees?: string; recorder?: string; text?: string };
+    const p = row.parsed as { place?: string; attendees?: string; recorder?: string; text?: string; subjects?: SubjectPlan[] };
     setForm({
       scope: row.scope,
       exam: row.exam,
@@ -177,6 +207,7 @@ function PlanSection({
       place: p.place ?? "",
       attendees: p.attendees ?? "",
       recorder: p.recorder ?? "",
+      subjectsText: subjectsToText(p.subjects ?? []),
       text: p.text ?? "",
       note: "",
       base: row,
@@ -192,6 +223,7 @@ function PlanSection({
       if (form.text.trim() === "") return "분할점수 표 내용이 비어 있어요.";
       if (parsedText.errors.length > 0) return "분할점수 표의 오류를 먼저 고쳐 주세요.";
     }
+    if (parsedSubjects && parsedSubjects.errors.length > 0) return "과목별 반영 비율의 오류를 먼저 고쳐 주세요.";
     if (hasPrevious && form.note.trim() === "") return "이미 올린 자료가 있어요. 정정 사유를 적어 주세요.";
     return null;
   })();
@@ -201,7 +233,12 @@ function PlanSection({
     setMessage(null);
     try {
       const parsed = isMinutes
-        ? { place: form.place.trim(), attendees: form.attendees.trim(), recorder: form.recorder.trim() }
+        ? {
+            place: form.place.trim(),
+            attendees: form.attendees.trim(),
+            recorder: form.recorder.trim(),
+            subjects: parsedSubjects?.subjects ?? [],
+          }
         : { text: form.text.trim() };
       const saved = await savePlan({
         kind,
@@ -347,6 +384,24 @@ function PlanSection({
                 참석자
                 <input className={`${field} flex-1`} placeholder="이름을 쉼표로 구분" value={form.attendees} onChange={(e) => set({ attendees: e.target.value })} />
               </label>
+              <div className="space-y-1 sm:col-span-2">
+                <p className="text-xs text-gray-600">
+                  과목별 정기시험·수행평가 반영 비율이에요. 한 줄에 <b>학년, 과목, 1차, 2차, 수행평가, 산출방식</b>을 탭으로 나눠 쓰고, 실시하지 않으면 -
+                  를 써요(산출방식은 추정분할, 고정분할, -). 교과협의록에서 과목 줄을 채우는 데 써요.
+                </p>
+                <textarea
+                  rows={6}
+                  className={`${field} w-full font-mono text-xs`}
+                  placeholder={"1\t공통수학2\t25%\t25%\t50%\t추정분할"}
+                  value={form.subjectsText}
+                  onChange={(e) => set({ subjectsText: e.target.value })}
+                />
+                {parsedSubjects?.errors.map((e, i) => (
+                  <p key={i} className="rounded-md bg-red-50 p-1.5 text-xs text-red-800">
+                    {e}
+                  </p>
+                ))}
+              </div>
             </div>
           ) : (
             <div className="space-y-1">

@@ -1,12 +1,19 @@
 // 올린 파일(hwpx, xlsx)에서 협의록의 장소·참석자·기록자와 분할점수 표를 읽어 온다.
 // 파일 서식이 학교마다·해마다 달라서 읽은 값은 '제안'이다. 화면에서 관리자가 확인하고 고친 뒤 저장한다.
-// PDF는 아직 글자를 읽지 않는다(올려 보관하고 값은 직접 입력).
+// PDF는 글자가 들어 있는 PDF만 읽는다(스캔한 그림이면 값을 직접 입력).
 import JSZip from "jszip";
 import { children, descendants, first, parseXml } from "../hwpx/dom.ts";
 import { paragraphText } from "../hwpx/text.ts";
+import { minutesFromPdf, readPdfPages, subjectsFromRows, type PdfJs, type SubjectPlan } from "./pdf.ts";
 
 export type FileType = "hwpx" | "pdf" | "xlsx";
-export type MinutesData = { place: string; attendees: string; recorder: string };
+export type MinutesData = {
+  place: string;
+  attendees: string;
+  recorder: string;
+  /** 협의록의 '과목별 정기시험 및 수행평가 반영 비율' 표 */
+  subjects?: SubjectPlan[];
+};
 
 export const fileTypeOf = (name: string): FileType | null => {
   const m = /\.(hwpx|pdf|xlsx)$/i.exec(name.trim());
@@ -79,7 +86,7 @@ export async function readXlsxRows(bytes: ArrayBuffer | Uint8Array): Promise<str
 
 // ───────── 협의록의 장소·참석자·기록자 ─────────
 
-const LABELS: Record<keyof MinutesData, string> = { place: "장소", attendees: "참석자", recorder: "기록자" };
+const LABELS: Record<"place" | "attendees" | "recorder", string> = { place: "장소", attendees: "참석자", recorder: "기록자" };
 const norm = (s: string) => s.replace(/[\s:：]/g, "");
 
 /** '장소' 같은 이름칸 오른쪽의 값 칸을 찾는다. 이름칸과 같은 줄에서 다음으로 글자가 있는 칸. */
@@ -93,7 +100,7 @@ function valueAfterLabel(rows: string[][], label: string): string {
   return "";
 }
 
-export function minutesFromRows(rows: string[][]): MinutesData {
+export function minutesFromRows(rows: string[][]): Pick<MinutesData, "place" | "attendees" | "recorder"> {
   return {
     place: valueAfterLabel(rows, LABELS.place),
     attendees: valueAfterLabel(rows, LABELS.attendees),
@@ -157,25 +164,45 @@ export type Extracted = {
   fileType: FileType;
   minutes: MinutesData | null;
   cutoffText: string | null;
+  /** 협의록 제목의 교과 이름과 협의 주제의 학년도·학기(PDF에서만 읽는다) */
+  area: string;
+  year: number | null;
+  semester: number | null;
   warnings: string[];
 };
 
-/** 파일에서 값을 제안한다. 읽지 못한 값은 빈 글자로 두고 warnings에 이유를 적는다. */
-export async function extractFromFile(name: string, bytes: ArrayBuffer | Uint8Array): Promise<Extracted> {
+/**
+ * 파일에서 값을 제안한다. 읽지 못한 값은 빈 글자로 두고 warnings에 이유를 적는다.
+ * PDF를 읽으려면 pdf.js가 필요하다. 브라우저에서는 알아서 불러오고, 시험에서는 pdfjs를 넘긴다.
+ */
+export async function extractFromFile(
+  name: string,
+  bytes: ArrayBuffer | Uint8Array,
+  options: { pdfjs?: PdfJs } = {},
+): Promise<Extracted> {
   const fileType = fileTypeOf(name);
   if (!fileType) throw new Error("hwpx, xlsx, pdf 파일만 올릴 수 있어요.");
-  const result: Extracted = { fileType, minutes: null, cutoffText: null, warnings: [] };
+  const result: Extracted = { fileType, minutes: null, cutoffText: null, area: "", year: null, semester: null, warnings: [] };
   try {
     if (fileType === "hwpx") {
       const tables = await readHwpxTables(bytes);
-      result.minutes = minutesFromRows(tables.flatMap((t) => t.map((r) => r.map((c) => c.text))));
+      const rows = tables.flatMap((t) => t.map((r) => r.map((c) => c.text)));
+      result.minutes = { ...minutesFromRows(rows), subjects: subjectsFromRows(rows) };
       result.cutoffText = cutoffTextFromTables(tables);
     } else if (fileType === "xlsx") {
       const rows = await readXlsxRows(bytes);
-      result.minutes = minutesFromRows(rows);
+      result.minutes = { ...minutesFromRows(rows), subjects: subjectsFromRows(rows) };
       result.cutoffText = cutoffTextFromRows(rows);
     } else {
-      result.warnings.push("PDF는 글자를 자동으로 읽지 못해요. 아래 값을 직접 입력하세요.");
+      const pdfjs = options.pdfjs ?? (await (await import("./pdf-browser.ts")).loadPdfjs());
+      const m = minutesFromPdf(await readPdfPages(bytes, pdfjs));
+      result.area = m.area;
+      result.year = m.year;
+      result.semester = m.semester;
+      result.minutes = { place: m.place, attendees: m.attendees, recorder: m.recorder, subjects: m.subjects };
+      if (!m.place && !m.attendees && !m.recorder && m.subjects.length === 0) {
+        result.warnings.push("PDF에서 글자를 읽지 못했어요. 스캔한 그림이면 읽을 수 없으니 아래 값을 직접 입력하세요.");
+      }
     }
   } catch (e) {
     result.warnings.push(e instanceof Error ? e.message : "파일을 읽지 못했어요.");

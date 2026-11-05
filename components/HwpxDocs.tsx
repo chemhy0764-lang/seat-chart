@@ -15,8 +15,10 @@ import {
 } from "@/lib/hwpx/docs";
 import { loadTemplate, safeName, saveFile } from "@/lib/hwpx/client";
 import { latestPlan } from "@/lib/plans/api";
+import type { SubjectPlan } from "@/lib/plans/pdf";
+import { examValueOf } from "@/lib/plans/subjectsText";
 import { examValueFor } from "@/lib/plans/exams";
-import { AREAS, OTHER as OTHER_AREA, subjectsFor } from "@/lib/subjects";
+import { AREAS, OTHER as OTHER_AREA, canonicalSubject, subjectsFor } from "@/lib/subjects";
 
 const box = "space-y-3 rounded-xl bg-white p-4 shadow-sm ring-1 ring-black/5";
 const field = "rounded-md border border-gray-300 px-2 py-1";
@@ -120,13 +122,26 @@ export function GuideSection({ term }: { term: Term }) {
         setPlanNote({ ok: false, text: `${name} 교과로 올라온 협의록이 없어요. '자료 첨부' 탭에서 관리자가 올리면 여기서 불러와요.` });
         return;
       }
-      const p = plan.parsed as { place?: string; attendees?: string; recorder?: string };
+      const p = plan.parsed as { place?: string; attendees?: string; recorder?: string; subjects?: SubjectPlan[] };
       if (overwrite || place.trim() === "") setPlace(p.place ?? "");
       if (overwrite || attendees.trim() === "") setAttendees(p.attendees ?? "");
       if (overwrite || recorder.trim() === "") setRecorder(p.recorder ?? "");
+      // 과목 줄은 아직 아무것도 채우지 않았을 때(또는 덮어쓰기 버튼) 올린 협의록의 반영 비율 표로 채운다.
+      const subs = Array.isArray(p.subjects) ? p.subjects : [];
+      const untouched = rows.every((r) => ROW_FIELDS.every(([k]) => r[k].trim() === "" || r[k] === EMPTY_ROW[k]));
+      const fillRows = subs.length > 0 && (overwrite || untouched);
+      if (fillRows) {
+        const hasList = subjectsFor(name).length > 0;
+        setRows(
+          subs.map((sp) => {
+            const c = canonicalSubject(sp.subject, name);
+            return { ...EMPTY_ROW, grade: sp.grade, subject: c.name, exam: examValueOf(sp), method: sp.method, custom: hasList && !c.inList };
+          }),
+        );
+      }
       setPlanNote({
         ok: true,
-        text: `올린 협의록(${plan.year}학년도 ${plan.semester}학기 ${plan.version}판)에서 장소·참석자·기록자를 불러왔어요. 확인하고 필요하면 고쳐 쓰세요.`,
+        text: `올린 협의록(${plan.year}학년도 ${plan.semester}학기 ${plan.version}판)에서 장소·참석자·기록자${fillRows ? `와 과목 ${subs.length}개` : ""}를 불러왔어요. 확인하고 필요하면 고쳐 쓰세요.`,
       });
     } catch (e) {
       setPlanNote({ ok: false, text: e instanceof Error ? e.message : "협의록을 불러오지 못했어요." });
@@ -241,7 +256,7 @@ export function GuideSection({ term }: { term: Term }) {
             disabled={areaChoice === "" || areaChoice === OTHER_AREA}
             onClick={() => loadMinutes(areaChoice, true)}
           >
-            올린 협의록에서 장소·참석자·기록자 불러오기
+            올린 협의록에서 장소·참석자·기록자·과목 불러오기
           </button>
           <span className="text-xs text-gray-500">교과를 고르면 비어 있는 칸은 자동으로 채워요.</span>
         </div>

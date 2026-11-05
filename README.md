@@ -39,5 +39,5 @@ DB 변경은 `supabase/migrations/`, 되돌리기는 `supabase/rollback.sql` 에
      select id from auth.users where email = '관리자 이메일';
      ```
 - 회원가입이 열려 있으면 가입한 누구나 올라온 자료를 볼 수 있습니다. 협의록에는 선생님 이름이 들어 있으니, 선생님 계정을 만든 뒤 Supabase 대시보드의 Authentication, Sign In / Providers에서 새 사용자 가입을 끄는 것을 권합니다.
-- PDF는 올려 보관만 하고 글자는 자동으로 읽지 않습니다(값은 직접 입력).
+- 협의록 PDF(글자가 들어 있는 PDF)는 교과, 장소, 참석자, 기록자와 "과목별 정기시험 및 수행평가 반영 비율" 표를 읽어 옵니다. 읽은 값은 화면에서 확인하고 고친 뒤 저장하며, 교과협의록 탭에서 교과를 고르면 과목 줄까지 채워집니다. 스캔한 그림 PDF는 읽지 못합니다. 추정분할점수 표는 xlsx, hwpx만 읽고 PDF는 직접 붙여넣습니다.
 
