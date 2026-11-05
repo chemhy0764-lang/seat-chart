@@ -32,8 +32,8 @@ export default function CutoffTool() {
   const sections: [Section, string][] = [
     ["guide", "분할점수 안내"],
     ["notice", "분할점수 공지"],
-    ["plans", "자료 첨부"],
     ["check", "점검 도구"],
+    ["plans", "자료 첨부"],
   ];
   return (
     <div className="space-y-4">
