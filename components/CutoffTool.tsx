@@ -165,7 +165,7 @@ function PerfTab() {
         </label>
       </div>
       <p className="text-sm text-gray-600">
-        E/I 단계 교과는 안내문에 학년으로 적혀 있고 연도마다 달라요(2025: 1학년, 2026 1학기: 1·2학년). 안내문을 확인해 체크하세요.
+        E/I 단계는 2026학년도 2학기 기준 1학년 교과만 해당해요. 안내문에 학년으로 적혀 있고 학기마다 달라질 수 있어요(2026학년도 1학기 PDF 안내는 1·2학년). 해당 학기 안내문을 확인해 체크하세요.
       </p>
 
       <div className="space-y-1 rounded-md bg-gray-50 p-3 text-sm">
@@ -223,7 +223,7 @@ function TermTab() {
   const [aCut, setACut] = useState("");
   const [average, setAverage] = useState("");
   const [aRatio, setARatio] = useState("");
-  const [limit, setLimit] = useState("");
+  const [limit, setLimit] = useState("23.9");
 
   const labels = ["A/B", "B/C", "C/D", "D/E", "E/I"];
   const usable = parts.filter((p) => num(p.weight) && num(p.scale));
@@ -314,7 +314,7 @@ function TermTab() {
           </label>
         </div>
         <p className="text-sm text-gray-600">
-          A 비율 상한은 안내문마다 달라요(2025학년도 2학기 1차 32.8%, 2026학년도 1~2학기 23.9%). 해당 학기 안내문의 값을 넣으세요.
+          A 비율 상한은 2026학년도 1~2학기 안내문 기준 23.9%로 채워 두었어요. 안내문마다 달랐어요(2025학년도 2학기 1차 32.8%). 해당 학기 안내문의 값으로 바꿔 쓰세요.
         </p>
         {semIssues && <Issues issues={semIssues} okText="학기말 점검 기준을 지켜요." />}
       </section>
