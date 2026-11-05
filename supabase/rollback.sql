@@ -1,5 +1,9 @@
 -- 되돌리기는 위에서부터 순서대로 실행한다.
 
+-- 20261105030000_public_plan_read 되돌리기
+drop policy if exists "누구나 자료 값 읽기" on public.plan_uploads;
+revoke select on public.plan_uploads from anon;
+
 -- 20261105020000_curriculum_uploads 되돌리기 (올린 편제표 기록과 hwp 기록이 지워진다. 파일은 대시보드 Storage의 plans 버킷에서 따로 지운다)
 delete from public.plan_uploads where kind = 'curriculum' or file_type = 'hwp';
 alter table public.plan_uploads drop constraint plan_uploads_kind_check;

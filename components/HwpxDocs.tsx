@@ -461,7 +461,8 @@ const EMPTY_TEXTS: Texts = {
   term: { 1: "", 2: "", 3: "" },
 };
 
-export function NoticeSection({ term }: { term: Term }) {
+/** admin이 아니면 학업성적관리회의 자료는 만들지 않고 가정통신문만 만든다. */
+export function NoticeSection({ term, admin = false }: { term: Term; admin?: boolean }) {
   const { year, semester } = term;
   const [kind, setKind] = useState<NoticeKind>("first");
   const [texts, setTexts] = useState<Texts>(EMPTY_TEXTS);
@@ -528,7 +529,7 @@ export function NoticeSection({ term }: { term: Term }) {
   return (
     <div className="space-y-4">
       <section className={box}>
-        <h2 className="font-semibold">가정통신문과 학업성적관리회의 자료</h2>
+        <h2 className="font-semibold">{admin ? "가정통신문과 학업성적관리회의 자료" : "가정통신문"}</h2>
         <div className="flex flex-wrap items-center gap-3 text-sm">
           <label className="flex items-center gap-2">
             문서 종류
@@ -599,6 +600,7 @@ export function NoticeSection({ term }: { term: Term }) {
           >
             가정통신문 내려받기
           </button>
+          {admin && (
           <button
             className={primary}
             disabled={!ready || meeting.busy || kind === "perf"}
@@ -613,8 +615,9 @@ export function NoticeSection({ term }: { term: Term }) {
           >
             학업성적관리회의 자료 내려받기
           </button>
+          )}
         </div>
-        {kind === "perf" && <p className="text-xs text-gray-500">수행평가는 회의 자료 서식이 없어서 가정통신문만 만들어요.</p>}
+        {admin && kind === "perf" && <p className="text-xs text-gray-500">수행평가는 회의 자료 서식이 없어서 가정통신문만 만들어요.</p>}
         {!ready && (
           <p className="text-xs text-gray-500">
             1·2학년을 올바르게 붙여넣으면 내려받을 수 있어요(3학년은 비워 둬도 돼요).
@@ -623,8 +626,8 @@ export function NoticeSection({ term }: { term: Term }) {
         <Message message={notice.message} />
         <Message message={meeting.message} />
         <p className="text-xs text-gray-500">
-          서식은 2026학년도 2학기 가정통신문(1차 정기시험, 수행평가)과 2025학년도 2학기 가정통신문(2차 정기시험·학기말)을 틀로 써요. 학교 이름, 인사말, 참고 내용은 틀 그대로입니다. 학업성적관리회의 자료는 원본이 없어
-          가정통신문의 표 서식으로 만들었고, 줄 간격과 글꼴이 학교에서 쓰던 PDF와 조금 다를 수 있어요.
+          서식은 2026학년도 2학기 가정통신문(1차 정기시험, 수행평가)과 2025학년도 2학기 가정통신문(2차 정기시험·학기말)을 틀로 써요. 학교 이름, 인사말, 참고 내용은 틀 그대로입니다.
+          {admin && " 학업성적관리회의 자료는 원본이 없어 가정통신문의 표 서식으로 만들었고, 줄 간격과 글꼴이 학교에서 쓰던 PDF와 조금 다를 수 있어요."}
         </p>
       </section>
     </div>

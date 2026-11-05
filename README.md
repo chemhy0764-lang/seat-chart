@@ -25,6 +25,11 @@ DB 변경은 `supabase/migrations/`, 되돌리기는 `supabase/rollback.sql` 에
 - 예방: `vercel.json`의 Cron이 하루 한 번 `/api/keepalive`를 호출해 데이터베이스에 가벼운 요청(`ping()` 함수)을 보냅니다. `supabase/migrations/20261105000000_add_ping.sql`을 한 번 실행해 두어야 합니다.
 - 이미 중지되었다면: Supabase 대시보드에서 프로젝트의 "Resume project"(한국어 번역으로는 "이력서 프로젝트")를 눌러 다시 시작합니다. 중지 후 일정 기간 안에만 가능합니다.
 
+## 누가 무엇을 보나
+- 링크만 있는 방문자(로그인 없음): 분할점수 안내, 분할점수 공지(가정통신문만). 올린 자료의 값(협의록 장소·참석자·기록자, 추정분할점수, 편제표 과목)으로 자동 채우기를 쓴다.
+- 관리자(`public.admins`에 등록된 계정): 위에 더해 자리 배치표, 학업성적관리회의 자료, 점검 도구, 편제표, 자료 첨부. 관리자 로그인은 `/login`(분할점수 페이지 위쪽 "관리자 로그인").
+- 화면에서 숨기는 것은 편의이고, 실제 보호는 DB 규칙이 한다: 올리기는 관리자만, 자리 배치표 데이터는 본인만(`owner_id`), 파일 원본은 로그인한 사용자만. 방문자용 읽기는 `supabase/migrations/20261105030000_public_plan_read.sql`로 연다.
+
 ## 올린 자료 보관(자료 첨부 탭)
 
 관리자가 평가계획서 교과별 협의록과 학년별 추정분할점수 파일(hwpx, xlsx, pdf)을 올려 두면, 안내·공지 탭에서 불러와 칸을 채웁니다.
@@ -33,6 +38,7 @@ DB 변경은 `supabase/migrations/`, 되돌리기는 `supabase/rollback.sql` 에
 - 처음 설정(Supabase SQL Editor에서 한 번):
   1. `supabase/migrations/20261105010000_plan_uploads.sql`의 내용을 실행합니다.
   2. (편제표 탭을 쓰려면) `supabase/migrations/20261105020000_curriculum_uploads.sql`의 내용도 이어서 실행합니다.
+  3. (방문자 자동 채우기를 쓰려면) `supabase/migrations/20261105030000_public_plan_read.sql`의 내용도 이어서 실행합니다.
   2. 관리자를 등록합니다. 아래 `관리자 이메일`을 본인 이메일로 바꿔 실행합니다.
 
      ```sql

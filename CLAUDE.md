@@ -12,6 +12,8 @@
 
 - 올린 자료: `public.admins`(관리자 목록, 앱에서는 읽기만), `public.plan_uploads`(자료 기록), Storage 비공개 버킷 `plans`. 열람은 로그인한 사용자, 올리기는 관리자만, 고치기·지우기 권한은 없다(정정은 새 판 추가). `plan_uploads.kind`는 minutes/cutoffs/curriculum(학년별 편제표, hwp). 테스트는 `lib/db/plan_uploads.test.ts`(PGlite로 RLS 확인).
 
+- 접근: `/cutoff`(분할점수 안내·공지)는 로그인 없이 누구나 쓴다. 자리 배치표(`/`), 점검 도구, 편제표, 자료 첨부, 학업성적관리회의 자료는 관리자(`public.admins`)만 본다(화면에서 숨김, 올리기는 RLS가 관리자만 허용). 방문자는 `plan_uploads`의 값 열을 읽어 자동 채우기를 쓴다(`uploaded_by`와 Storage 파일 원본은 로그인한 사용자만). 가입 화면은 없다.
+
 ## 규칙
 - 환경변수는 공개용 `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` 두 개뿐이다. service_role/secret 키는 쓰지 않는다.
 - 접근 통제는 RLS(`(select auth.uid()) = owner_id`)로만 한다. 정책을 바꾸면 비로그인·본인·타인 검사를 다시 한다.

@@ -17,7 +17,11 @@ async function Editor() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/cutoff");
+
+  // 자리 배치표는 관리자만 본다. admins 표는 본인 행만 읽히므로 행이 보이면 관리자다.
+  const { data: admin } = await supabase.from("admins").select("user_id").limit(1);
+  if (!admin || admin.length === 0) redirect("/cutoff");
 
   const { data: row } = await supabase
     .from("seat_charts")
