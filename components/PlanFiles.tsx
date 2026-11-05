@@ -197,7 +197,7 @@ function PlanSection({
         texts = { ...BLANK_TEXTS, [kind]: result.cutoffText };
         found.push(`표의 값 개수로 '${EXAM_LABELS[kind]}' 표로 보고 그 칸에 넣었어요. 아니면 칸을 옮겨 주세요.`);
       } else if (result.fileType === "pdf") {
-        found.push("PDF의 분할점수 표는 아직 자동으로 읽지 못해요. 아래 칸에 직접 붙여넣어 주세요(NEIS 엑셀은 읽어요).");
+        found.push("이 PDF에서 NEIS 추정분할점수 표('학기말 추정분할점수')를 찾지 못했어요. NEIS에서 받은 PDF나 엑셀을 올리거나, 아래 칸에 직접 붙여넣어 주세요.");
       }
     }
     if (isMinutes && result.minutes && !result.minutes.place && !result.minutes.attendees && !result.minutes.recorder && result.warnings.length === 0) {
@@ -244,7 +244,8 @@ function PlanSection({
     if (!form.scope) return isMinutes ? "교과를 선택하세요." : "학년을 선택하세요.";
     if (!form.file && !form.base) return "올릴 파일을 선택하세요.";
     if (parsedTexts) {
-      if (EXAM_KINDS.every((k) => form.texts[k].trim() === "")) return "분할점수 표가 비어 있어요.";
+      // 표를 읽지 못했더라도 파일을 올렸다면 파일만 보관할 수 있다(값이 없는 자료는 공지 탭 불러오기에서 건너뛴다).
+      if (EXAM_KINDS.every((k) => form.texts[k].trim() === "") && !form.file) return "분할점수 표가 비어 있어요.";
       if (EXAM_KINDS.some((k) => (parsedTexts[k]?.errors.length ?? 0) > 0)) return "분할점수 표의 오류를 먼저 고쳐 주세요.";
     }
     if (parsedSubjects && parsedSubjects.errors.length > 0) return "과목별 반영 비율의 오류를 먼저 고쳐 주세요.";
@@ -377,6 +378,11 @@ function PlanSection({
             )}
           </div>
           <DropZone file={form.file} accept=".hwpx,.xlsx,.pdf" hint="hwpx, xlsx, pdf · 한 번에 하나" onFiles={receiveFiles} />
+          {!isMinutes && form.file && EXAM_KINDS.every((k) => form.texts[k].trim() === "") && (
+            <p className="rounded-md bg-amber-50 p-2 text-xs text-amber-900">
+              파일에서 분할점수 표를 읽지 못했어요. 이대로 저장하면 파일만 보관되고, 공지 탭에서는 불러올 값이 없어요. 아래 칸에 표를 직접 붙여넣을 수도 있어요.
+            </p>
+          )}
           {form.base && !form.file && <p className="text-xs text-gray-500">새 파일을 고르지 않으면 {form.base.file_name} 파일은 그대로 두고 아래 값만 정정해요.</p>}
           {notes.map((n, i) => (
             <p key={i} className="rounded-md bg-amber-50 p-2 text-xs text-amber-900">
