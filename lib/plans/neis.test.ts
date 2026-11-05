@@ -146,3 +146,20 @@ test("엑셀 파일에서 학년·학기와 시험별 표를 한꺼번에 읽는
   assert.equal(r.cutoffTexts!.term.split("\n").length, 2);
   assert.deepEqual(r.warnings, []);
 });
+
+test("2026학년도 2학기 표기('정기시험/수행평가구분', 구분 값 '정기시험'·'수행평가')의 엑셀도 읽는다", () => {
+  const rows = [
+    row({ A: "2026학년도   2학기   주간   1학년   일반학과" }),
+    row({ A: "학년도", B: "학기", C: "과정", D: "계열/학년/학과", E: "편제", F: "과목", G: "정기시험/수행평가 구분", H: "반영비율", I: "고사/영역", J: "성취수준추정분할점수" }),
+    row({ J: "A/B", K: "B/C", L: "C/D", M: "D/E", N: "E/미도달" }),
+    row({ E: "가교과", F: "공통가과목2(4)", G: "정기시험", H: "24.0", I: "1차 정기시험", J: "83.04", K: "70.18", L: "55.18", M: "40.18", N: "22.18" }),
+    row({ G: "수행평가", H: "52.0", I: "[전체영역]", J: "52.0", K: "49.0", L: "38.0", M: "28.0", N: "21.0" }),
+    row({ G: "미산출" }),
+  ];
+  assert.equal(looksLikeNeis(rows), true);
+  const t = parseNeisRows(rows);
+  assert.deepEqual([t.year, t.semester, t.grade], [2026, 2, 1]);
+  assert.deepEqual(t.subjects[0].first, ["83.04", "70.18", "55.18", "40.18", "22.18"]);
+  assert.deepEqual(t.subjects[0].perf, { max: "52", values: ["52", "49", "38", "28", "21"] });
+});
+

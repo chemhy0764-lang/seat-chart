@@ -5,6 +5,7 @@ import JSZip from "jszip";
 import { children, descendants, first, parseXml } from "../hwpx/dom.ts";
 import { paragraphText } from "../hwpx/text.ts";
 import { looksLikeNeis, neisTexts, parseNeisRows, type NeisTexts } from "./neis.ts";
+import { looksLikeNeisPdf, parseNeisPdf } from "./neis-pdf.ts";
 import { minutesFromPdf, readPdfPages, subjectsFromRows, type PdfJs, type SubjectPlan } from "./pdf.ts";
 
 export type FileType = "hwpx" | "pdf" | "xlsx";
@@ -209,7 +210,18 @@ export async function extractFromFile(
       }
     } else {
       const pdfjs = options.pdfjs ?? (await (await import("./pdf-browser.ts")).loadPdfjs());
-      const m = minutesFromPdf(await readPdfPages(bytes, pdfjs));
+      const pages = await readPdfPages(bytes, pdfjs);
+      if (looksLikeNeisPdf(pages)) {
+        // NEIS '학기말 추정분할점수 전체교과목' PDF: 엑셀과 같이 시험별 표로 읽는다
+        const table = parseNeisPdf(pages);
+        result.cutoffTexts = neisTexts(table);
+        result.grade = table.grade;
+        result.year = table.year;
+        result.semester = table.semester;
+        if (table.subjects.length === 0) result.warnings.push("NEIS 표에서 과목을 찾지 못했어요.");
+        return result;
+      }
+      const m = minutesFromPdf(pages);
       result.area = m.area;
       result.year = m.year;
       result.semester = m.semester;

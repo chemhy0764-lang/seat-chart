@@ -30,9 +30,20 @@ export function tidyNumber(text: string): string {
 
 const KINDS = ["지필", "수행", "미산출"];
 
+/** NEIS 표기가 해마다 다르다: 구분 값 '지필'/'수행'(2026년 1학기까지)과 '정기시험'/'수행평가'(2026년 2학기). 하나로 맞춘다. */
+export function normalizeKind(raw: string): string {
+  const k = raw.replace(/\s+/g, "");
+  if (k === "지필" || k === "지필평가" || k === "정기시험") return "지필";
+  if (k === "수행" || k === "수행평가") return "수행";
+  return k;
+}
+
+/** 머리글의 구분 칸 이름('지필/수행구분' 또는 '정기시험/수행평가구분') */
+export const isKindHeader = (cell: string) => /^(지필\/수행|정기시험\/수행평가)구분$/.test(cell.replace(/\s+/g, ""));
+
 /** 이 표가 NEIS 추정분할점수 표인지(머리글로 판별). */
 export function looksLikeNeis(rows: string[][]): boolean {
-  return rows.some((r) => r.includes("지필/수행구분")) && rows.some((r) => r.some((c) => /성취수준추정분할점수/.test(c)));
+  return rows.some((r) => r.some(isKindHeader)) && rows.some((r) => r.some((c) => /성취수준추정분할점수/.test(c)));
 }
 
 export function parseNeisRows(rows: string[][]): NeisTable {
@@ -58,18 +69,18 @@ export function parseNeisRows(rows: string[][]): NeisTable {
   for (const row of rows) {
     const cells = row.map((c) => (c ?? "").trim());
     // 머리글 줄: 열 위치를 다시 잡는다(쪽마다 반복됨)
-    if (cells.includes("지필/수행구분")) {
+    if (cells.some(isKindHeader)) {
       col = {
         area: Math.max(0, cells.indexOf("편제")),
         subject: cells.indexOf("과목"),
-        kind: cells.indexOf("지필/수행구분"),
+        kind: cells.findIndex(isKindHeader),
         ratio: cells.indexOf("반영비율"),
         exam: cells.indexOf("고사/영역"),
         first: cells.findIndex((c) => /성취수준추정분할점수/.test(c)),
       };
       continue;
     }
-    const kind = cells[col.kind] ?? "";
+    const kind = normalizeKind(cells[col.kind] ?? "");
     const isFinal = /학기말최종/.test(kind);
     if (!KINDS.includes(kind) && !isFinal) continue;
 
