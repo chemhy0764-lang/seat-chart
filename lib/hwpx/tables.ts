@@ -6,58 +6,61 @@ type Pos = [row: number, col: number];
 
 type RowProto = { group?: Pos; name: Pos; lead?: Pos; first: Pos; mid: Pos; last: Pos };
 
-/** 템플릿 표에서 어떤 칸의 서식(테두리·글꼴)을 본뜰지 정해 둔 표 */
+/**
+ * 템플릿 표에서 어떤 칸의 서식(테두리·글꼴)을 본뜰지 정해 둔 표.
+ * 묶음(추정/고정) 하나가 여러 줄이면 first(첫 줄)·mid(가운데 줄)·end(마지막 줄) 서식을 쓰고,
+ * 한 줄뿐이면 single 서식을 쓴다(없으면 end 서식에 첫 줄의 묶음 칸을 붙인다).
+ */
 export type Family = {
   hasGroup: boolean;
   /** 값 칸 앞에 이름형 칸이 하나 더 있는지(수행평가의 '만점' 칸) */
   hasLead: boolean;
   header: { group?: Pos; name: Pos; title: Pos; labelLead?: Pos; labelFirst: Pos; labelMid: Pos; labelLast: Pos };
-  /** A: 마지막이 아닌 묶음, B: 마지막 묶음. 묶음이 없으면 A만 쓴다. */
-  A: { first: RowProto; mid: RowProto };
-  B?: { first: RowProto; mid: RowProto; last: RowProto };
+  first: RowProto;
+  mid: RowProto;
+  end: RowProto;
+  single?: RowProto;
 };
 
-/** 1차·2차 정기시험 표(값 4칸: 2·3학년). 가정통신문 서식 표 4번째(2학년 표). */
+/** 정기시험 공지의 2학년 표(값 4칸: 2·3학년). 묶음 둘(추정 15줄, 고정 1줄). */
 export const F4: Family = {
   hasGroup: true,
   hasLead: false,
   header: { group: [0, 0], name: [0, 1], title: [0, 2], labelFirst: [1, 2], labelMid: [1, 3], labelLast: [1, 5] },
-  A: {
-    first: { group: [2, 0], name: [2, 1], first: [2, 2], mid: [2, 3], last: [2, 5] },
-    mid: { name: [3, 1], first: [3, 2], mid: [3, 3], last: [3, 5] },
-  },
-  B: {
-    first: { group: [10, 0], name: [10, 1], first: [10, 2], mid: [10, 3], last: [10, 5] },
-    mid: { name: [11, 1], first: [11, 2], mid: [11, 3], last: [11, 5] },
-    last: { name: [15, 1], first: [15, 2], mid: [15, 3], last: [15, 5] },
-  },
+  first: { group: [2, 0], name: [2, 1], first: [2, 2], mid: [2, 3], last: [2, 5] },
+  mid: { name: [3, 1], first: [3, 2], mid: [3, 3], last: [3, 5] },
+  end: { name: [16, 1], first: [16, 2], mid: [16, 3], last: [16, 5] },
+  single: { group: [17, 0], name: [17, 1], first: [17, 2], mid: [17, 3], last: [17, 5] },
 };
 
-/** 값 5칸(E/I 포함: 1학년). 가정통신문 서식 표 3번째(1학년 표). */
+/** 정기시험 공지의 1학년 표(값 5칸, E/I 포함). 묶음 하나(추정 6줄). */
 export const F5: Family = {
   hasGroup: true,
   hasLead: false,
   header: { group: [0, 0], name: [0, 1], title: [0, 2], labelFirst: [1, 2], labelMid: [1, 3], labelLast: [1, 6] },
-  A: {
-    first: { group: [2, 0], name: [2, 1], first: [2, 2], mid: [2, 3], last: [2, 6] },
-    mid: { name: [3, 1], first: [3, 2], mid: [3, 3], last: [3, 6] },
-  },
-  B: {
-    first: { group: [7, 0], name: [7, 1], first: [7, 2], mid: [7, 3], last: [7, 6] },
-    mid: { group: [7, 0], name: [7, 1], first: [7, 2], mid: [7, 3], last: [7, 6] },
-    last: { group: [7, 0], name: [7, 1], first: [7, 2], mid: [7, 3], last: [7, 6] },
-  },
+  first: { group: [2, 0], name: [2, 1], first: [2, 2], mid: [2, 3], last: [2, 6] },
+  mid: { name: [3, 1], first: [3, 2], mid: [3, 3], last: [3, 6] },
+  end: { name: [7, 1], first: [7, 2], mid: [7, 3], last: [7, 6] },
 };
 
-/** 수행평가 표(교과, 만점, 값). 수행평가 가정통신문 서식 표. */
-export const PERF: Family = {
-  hasGroup: false,
+/** 수행평가 공지의 1학년 표(구분, 교과, 만점, 값 5칸). */
+export const PERF5: Family = {
+  hasGroup: true,
   hasLead: true,
-  header: { name: [0, 0], title: [0, 1], labelLead: [1, 1], labelFirst: [1, 2], labelMid: [1, 3], labelLast: [1, 6] },
-  A: {
-    first: { name: [2, 0], lead: [2, 1], first: [2, 2], mid: [2, 3], last: [2, 6] },
-    mid: { name: [3, 0], lead: [3, 1], first: [3, 2], mid: [3, 3], last: [3, 6] },
-  },
+  header: { group: [0, 0], name: [0, 1], title: [0, 2], labelLead: [1, 2], labelFirst: [1, 3], labelMid: [1, 4], labelLast: [1, 7] },
+  first: { group: [2, 0], name: [2, 1], lead: [2, 2], first: [2, 3], mid: [2, 4], last: [2, 7] },
+  mid: { name: [3, 1], lead: [3, 2], first: [3, 3], mid: [3, 4], last: [3, 7] },
+  end: { name: [7, 1], lead: [7, 2], first: [7, 3], mid: [7, 4], last: [7, 7] },
+};
+
+/** 수행평가 공지의 2학년 표(구분, 교과, 만점, 값 4칸). */
+export const PERF4: Family = {
+  hasGroup: true,
+  hasLead: true,
+  header: { group: [0, 0], name: [0, 1], title: [0, 2], labelLead: [1, 2], labelFirst: [1, 3], labelMid: [1, 4], labelLast: [1, 6] },
+  first: { group: [2, 0], name: [2, 1], lead: [2, 2], first: [2, 3], mid: [2, 4], last: [2, 6] },
+  mid: { name: [3, 1], lead: [3, 2], first: [3, 3], mid: [3, 4], last: [3, 6] },
+  end: { name: [16, 1], lead: [16, 2], first: [16, 3], mid: [16, 4], last: [16, 6] },
 };
 
 export type SpecRow = { name: string; lead?: string; values: string[] };
@@ -66,6 +69,8 @@ export type TableSpec = {
   /** 머리글 묶음: 제목 칸과 그 아래 라벨 칸들(수행평가의 '만점'은 leadLabel로) */
   titles: { title: string; labels: string[] }[];
   leadLabel?: string;
+  /** 이름 칸 머리글(서식에 맞춰 기본은 "과목") */
+  nameLabel?: string;
   groups: SpecGroup[];
 };
 
@@ -119,7 +124,7 @@ export function buildTable(template: Element, family: Family, spec: TableSpec, n
   const ncols = group + 1 + lead + labelCount;
 
   // 열 너비
-  const firstDataRow = family.A.first;
+  const firstDataRow = family.first;
   const tmplCols = group + 1 + lead + labelCountOfTemplate(template, family);
   const tableW = num(first(template, "sz"), "width");
   const widths: number[] = [];
@@ -140,7 +145,7 @@ export function buildTable(template: Element, family: Family, spec: TableSpec, n
   const hp = family.header;
   const titleH = height(cellAt(template, hp.title));
   const labelH = height(cellAt(template, hp.labelFirst));
-  const dataH = height(cellAt(template, family.A.mid.name));
+  const dataH = height(cellAt(template, family.mid.name));
 
   const trs: Element[] = [];
   const newTr = (cells: Element[]) => {
@@ -153,7 +158,7 @@ export function buildTable(template: Element, family: Family, spec: TableSpec, n
   const head0: Element[] = [];
   let col = 0;
   if (group) head0.push(makeCell(cellAt(template, hp.group!), { col: col++, row: 0, rowSpan: 2, w: widths[0], h: titleH + labelH, lines: ["구분"] }));
-  head0.push(makeCell(cellAt(template, hp.name), { col: col++, row: 0, rowSpan: 2, w: widths[col - 1], h: titleH + labelH, lines: ["교과"] }));
+  head0.push(makeCell(cellAt(template, hp.name), { col: col++, row: 0, rowSpan: 2, w: widths[col - 1], h: titleH + labelH, lines: [spec.nameLabel ?? "과목"] }));
   const leadCol = lead ? col++ : -1;
   // 제목 칸은 '만점'(있다면)부터 시작한다
   let labelCol = leadCol >= 0 ? leadCol : col;
@@ -185,18 +190,20 @@ export function buildTable(template: Element, family: Family, spec: TableSpec, n
 
   // 자료 줄
   let rowAddr = 2;
-  spec.groups.forEach((g, gi) => {
-    const isFinal = gi === spec.groups.length - 1;
+  spec.groups.forEach((g) => {
     const rows = g.rows;
     rows.forEach((r, ri) => {
       let proto: RowProto;
-      if (isFinal && family.B) proto = ri === 0 ? family.B.first : ri === rows.length - 1 ? family.B.last : family.B.mid;
-      else proto = ri === 0 ? family.A.first : family.A.mid;
+      if (rows.length === 1) {
+        proto = family.single ?? { ...family.end, group: family.first.group };
+      } else if (ri === 0) proto = family.first;
+      else if (ri === rows.length - 1) proto = family.end;
+      else proto = family.mid;
       const cells: Element[] = [];
       let cc = 0;
       if (group && ri === 0) {
         cells.push(
-          makeCell(cellAt(template, proto.group ?? family.A.first.group!), {
+          makeCell(cellAt(template, proto.group ?? family.first.group!), {
             col: 0,
             row: rowAddr,
             rowSpan: rows.length,
