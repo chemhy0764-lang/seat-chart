@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { GuideSection, NoticeSection } from "@/components/HwpxDocs";
+import PlanFiles from "@/components/PlanFiles";
 import { YEARS, type Semester } from "@/lib/hwpx/docs";
 import {
   LEVELS,
@@ -17,7 +18,7 @@ import {
   type Rates,
 } from "@/lib/cutoff";
 
-type Section = "guide" | "notice" | "check";
+type Section = "guide" | "notice" | "plans" | "check";
 type Tab = "paper" | "perf" | "term";
 
 const num = (s: string): number | null => (s.trim() === "" || Number.isNaN(Number(s)) ? null : Number(s));
@@ -31,6 +32,7 @@ export default function CutoffTool() {
   const sections: [Section, string][] = [
     ["guide", "분할점수 안내"],
     ["notice", "분할점수 공지"],
+    ["plans", "자료 첨부"],
     ["check", "점검 도구"],
   ];
   return (
@@ -75,6 +77,7 @@ export default function CutoffTool() {
       )}
       {section === "guide" && <GuideSection term={{ year, semester }} />}
       {section === "notice" && <NoticeSection term={{ year, semester }} />}
+      {section === "plans" && <PlanFiles term={{ year, semester }} />}
       {section === "check" && <CheckTool />}
     </div>
   );

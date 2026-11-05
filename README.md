@@ -24,3 +24,20 @@ DB 변경은 `supabase/migrations/`, 되돌리기는 `supabase/rollback.sql` 에
 
 - 예방: `vercel.json`의 Cron이 하루 한 번 `/api/keepalive`를 호출해 데이터베이스에 가벼운 요청(`ping()` 함수)을 보냅니다. `supabase/migrations/20261105000000_add_ping.sql`을 한 번 실행해 두어야 합니다.
 - 이미 중지되었다면: Supabase 대시보드에서 프로젝트의 "Resume project"(한국어 번역으로는 "이력서 프로젝트")를 눌러 다시 시작합니다. 중지 후 일정 기간 안에만 가능합니다.
+
+## 올린 자료 보관(자료 첨부 탭)
+
+관리자가 평가계획서 교과별 협의록과 학년별 추정분할점수 파일(hwpx, xlsx, pdf)을 올려 두면, 안내·공지 탭에서 불러와 칸을 채웁니다.
+
+- 열람은 로그인한 사용자 모두, 올리기는 관리자만 할 수 있습니다. 올린 자료는 지우거나 고칠 수 없고, 정정은 새 판으로 추가됩니다.
+- 처음 설정(Supabase SQL Editor에서 한 번):
+  1. `supabase/migrations/20261105010000_plan_uploads.sql`의 내용을 실행합니다.
+  2. 관리자를 등록합니다. 아래 `관리자 이메일`을 본인 이메일로 바꿔 실행합니다.
+
+     ```sql
+     insert into public.admins (user_id)
+     select id from auth.users where email = '관리자 이메일';
+     ```
+- 회원가입이 열려 있으면 가입한 누구나 올라온 자료를 볼 수 있습니다. 협의록에는 선생님 이름이 들어 있으니, 선생님 계정을 만든 뒤 Supabase 대시보드의 Authentication, Sign In / Providers에서 새 사용자 가입을 끄는 것을 권합니다.
+- PDF는 올려 보관만 하고 글자는 자동으로 읽지 않습니다(값은 직접 입력).
+
