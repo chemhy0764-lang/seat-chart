@@ -508,8 +508,9 @@ export function NoticeSection({ term }: { term: Term }) {
     const empty = texts[kind][grade].trim() === "";
     return { grade, parsed, empty };
   });
-  // 수행평가 공지는 3학년 표가 없는 서식이라, 3학년은 비워 두면 '전 과목 고정분할' 안내 문구가 그대로 들어간다.
-  const optional = (g: { grade: number }) => kind === "perf" && g.grade === 3;
+  // 3학년은 추정분할 교과가 없을 수 있어 비워 둘 수 있다. 수행평가는 비우면 '전 과목 고정분할' 안내 문구가 그대로 들어가고,
+  // 1차·2차·학기말은 3학년 제목과 표가 빠진다.
+  const optional = (g: { grade: number }) => g.grade === 3;
   const ready = grades.every((g) =>
     optional(g) && g.empty ? true : !g.empty && g.parsed.errors.length === 0 && g.parsed.groups.length > 0,
   );
@@ -557,7 +558,7 @@ export function NoticeSection({ term }: { term: Term }) {
         {grades.map(({ grade, parsed, empty }) => (
           <div key={grade} className="space-y-1">
             <label className="text-sm font-semibold" htmlFor={`g${grade}`}>
-              {grade}학년{kind === "perf" && grade === 3 ? " (선택: 비우면 '전 과목 고정분할' 안내 문구)" : ""}
+              {grade}학년{grade === 3 ? (kind === "perf" ? " (선택: 비우면 '전 과목 고정분할' 안내 문구)" : " (선택: 추정분할 교과가 없으면 비워 두세요. 3학년 표 없이 만들어요)") : ""}
             </label>
             <textarea
               id={`g${grade}`}
@@ -612,7 +613,7 @@ export function NoticeSection({ term }: { term: Term }) {
         {kind === "perf" && <p className="text-xs text-gray-500">수행평가는 회의 자료 서식이 없어서 가정통신문만 만들어요.</p>}
         {!ready && (
           <p className="text-xs text-gray-500">
-            {kind === "perf" ? "1·2학년을" : "세 학년을 모두"} 올바르게 붙여넣으면 내려받을 수 있어요.
+            1·2학년을 올바르게 붙여넣으면 내려받을 수 있어요(3학년은 비워 둬도 돼요).
           </p>
         )}
         <Message message={notice.message} />

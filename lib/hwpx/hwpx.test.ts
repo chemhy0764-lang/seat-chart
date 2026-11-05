@@ -175,6 +175,20 @@ test("가정통신문 3종과 회의 자료: 표가 온전하고 글자가 바�
   const noThirdDoc = await sectionOf(noThird);
   assert.deepEqual(tablesOf(noThirdDoc).filter((t) => Number(t.getAttribute("colCnt")) > 5).map((t) => Number(t.getAttribute("colCnt"))), [8, 7]);
   assert.ok(allText(noThirdDoc).includes("2027학년도 1학기 3학년은 전 과목 고정분할"));
+  // 1차·2차·학기말에서 3학년 자료가 없으면 3학년 제목과 표가 빠지고 나머지는 온전하다.
+  for (const kind of ["first", "term"] as const) {
+    const two = gradesFor(kind).slice(0, 2);
+    const notice = await sectionOf(await docs.buildNotice(tpl(kind === "term" ? "notice-term" : "notice-written"), { year: 2027, semester: 1, kind, grades: two, date }));
+    const noticeText = allText(notice);
+    assert.ok(!noticeText.includes("3학년 1차") && !noticeText.includes("3학년 2차") && !noticeText.includes("3학년 학기말"), `${kind}: 3학년 제목이 남아 있어요`);
+    assert.ok(noticeText.includes("2027학년도 1학기 1학년") && noticeText.includes("2027학년도 1학기 2학년") && noticeText.includes("2027. 4. 20."));
+    assert.equal(tablesOf(notice).filter((t) => Number(t.getAttribute("colCnt")) > 5).length, 2);
+    tablesOf(notice).filter((t) => Number(t.getAttribute("rowCnt")) >= 4).forEach(assertCovers);
+    const meeting = await sectionOf(await docs.buildMeeting(tpl(kind === "term" ? "notice-term" : "notice-written"), { year: 2027, semester: 1, kind, grades: two, date }));
+    assert.equal(tablesOf(meeting).length, 2);
+    assert.ok(!allText(meeting).includes("3학년"));
+    tablesOf(meeting).forEach(assertCovers);
+  }
   for (const kind of ["first", "term"] as const) {
     const bytes = await docs.buildMeeting(tpl(kind === "term" ? "notice-term" : "notice-written"), { year: 2027, semester: 2, kind, grades: gradesFor(kind), date });
     const doc = await sectionOf(bytes);
