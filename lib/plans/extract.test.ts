@@ -103,7 +103,7 @@ test("엑셀에서 협의록 값을 읽는다", async () => {
     ["참석자", "가나, 다라, 마바", "기록자", "inline:다라"],
   ]);
   const r = await extractFromFile("협의록.xlsx", bytes);
-  assert.deepEqual(r.minutes, { place: "화학실", attendees: "가나, 다라, 마바", recorder: "다라" });
+  assert.deepEqual(r.minutes, { place: "화학실", attendees: "가나, 다라, 마바", recorder: "다라", subjects: [] });
 });
 
 test("엑셀에서 분할점수 표를 붙여넣기 형식으로 읽는다", async () => {
@@ -125,11 +125,11 @@ test("엑셀에서 분할점수 표를 붙여넣기 형식으로 읽는다", asy
   assert.deepEqual(parsed.groups.map((g) => [g.kind, g.rows.length]), [["추정", 2], ["고정", 1]]);
 });
 
-test("PDF는 글자를 읽지 않고 안내만 한다. 잘못된 파일은 오류 안내", async () => {
-  const pdf = await extractFromFile("a.pdf", new Uint8Array([1, 2, 3]));
+test("글자를 읽을 수 없는 PDF·파일은 안내를 돌려주고, 지원하지 않는 형식은 거부한다", async () => {
+  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
+  const pdf = await extractFromFile("a.pdf", new Uint8Array([1, 2, 3]), { pdfjs });
   assert.equal(pdf.minutes, null);
-  assert.equal(pdf.cutoffText, null);
-  assert.match(pdf.warnings[0], /PDF/);
+  assert.ok(pdf.warnings.length > 0);
   const bad = await extractFromFile("a.xlsx", new Uint8Array([1, 2, 3]));
   assert.ok(bad.warnings.length > 0);
   await assert.rejects(() => extractFromFile("a.exe", new Uint8Array()), /hwpx, xlsx, pdf/);

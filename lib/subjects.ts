@@ -29,3 +29,31 @@ export const SUBJECTS_BY_AREA: Record<(typeof AREAS)[number], string[]> = {
 export function subjectsFor(area: string): string[] {
   return (SUBJECTS_BY_AREA as Record<string, string[]>)[area] ?? [];
 }
+
+// ───────── 올린 협의록의 이름을 목록의 이름에 맞추기 ─────────
+
+/** 공백·가운뎃점·쉼표를 없애고 로마자 숫자(II, I)를 Ⅱ, Ⅰ로 맞춘 비교용 글자. */
+const key = (name: string) =>
+  name
+    .replace(/[\s·,，]/g, "")
+    .replace(/([가-힣])II$/, "$1Ⅱ")
+    .replace(/([가-힣])I$/, "$1Ⅰ");
+
+/** 올린 파일의 과목 이름이 해당 교과 목록에 있으면 목록의 표기로, 없으면 그대로. */
+export function canonicalSubject(raw: string, area: string): { name: string; inList: boolean } {
+  const hit = subjectsFor(area).find((s) => key(s) === key(raw));
+  return hit ? { name: hit, inList: true } : { name: raw.trim(), inList: false };
+}
+
+/**
+ * 협의록 제목의 교과 이름('사회', '제2외국어, 한문', '인간과 심리' 등)을 교과 목록의 이름으로.
+ * 교과 이름이 아니라 교양 과목 이름이 제목에 쓰인 경우(인간과 심리)는 그 과목이 든 교과로 본다. 모르면 빈 글자.
+ */
+export function matchArea(raw: string): string {
+  const k = key(raw);
+  if (k === "") return "";
+  const direct = AREAS.find((a) => key(a) === k);
+  if (direct) return direct;
+  return AREAS.find((a) => SUBJECTS_BY_AREA[a].some((s) => key(s) === k)) ?? "";
+}
+
