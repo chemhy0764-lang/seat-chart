@@ -70,7 +70,7 @@ const EMPTY_ROW: MinutesRow = { grade: "", subject: "", writer: "", reviewer: ""
 type UiRow = MinutesRow & { custom: boolean };
 const blankRow = (): UiRow => ({ ...EMPTY_ROW, custom: false });
 const ROW_FIELDS: [keyof MinutesRow, string, string][] = [
-  ["grade", "학년", "w-12"],
+  ["grade", "학년", "w-20"],
   ["subject", "과목명", "w-28"],
   ["writer", "출제교사", "w-28"],
   ["reviewer", "검토교사", "w-24"],
@@ -208,7 +208,22 @@ export function GuideSection({ term }: { term: Term }) {
           {rows.map((r, i) => (
             <div key={i} className="flex items-center gap-1 text-sm">
               {ROW_FIELDS.map(([key, label, w]) =>
-                key === "subject" && subjects.length > 0 ? (
+                key === "grade" ? (
+                  <select
+                    key={key}
+                    aria-label={label}
+                    className={`${field} ${w}`}
+                    value={r.grade}
+                    onChange={(e) => setRow(i, "grade", e.target.value)}
+                  >
+                    <option value="">학년</option>
+                    {["1", "2", "3"].map((g) => (
+                      <option key={g} value={g}>
+                        {g}
+                      </option>
+                    ))}
+                  </select>
+                ) : key === "subject" && subjects.length > 0 ? (
                   <span key={key} className="flex items-center gap-1">
                     <select
                       aria-label={label}
