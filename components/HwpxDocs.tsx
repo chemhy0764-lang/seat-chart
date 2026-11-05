@@ -14,6 +14,7 @@ import {
   type Term,
 } from "@/lib/hwpx/docs";
 import { loadTemplate, safeName, saveFile } from "@/lib/hwpx/client";
+import { AREAS, OTHER as OTHER_AREA, subjectsFor } from "@/lib/subjects";
 
 const box = "space-y-3 rounded-xl bg-white p-4 shadow-sm ring-1 ring-black/5";
 const field = "rounded-md border border-gray-300 px-2 py-1";
@@ -64,11 +65,10 @@ const resolveDate = (date: string) => {
 
 // ───────── 분할점수 안내 ─────────
 
-/** 교과협의록의 교과 선택 목록. 목록에 없으면 '직접 입력'을 고른다. */
-const AREAS = ["국어", "수학", "영어", "사회", "과학", "체육", "음악", "미술", "기술·가정", "정보", "제2외국어", "한문", "교양"];
-const OTHER_AREA = "직접 입력";
-
 const EMPTY_ROW: MinutesRow = { grade: "", subject: "", writer: "", reviewer: "", exam: "1, 2차", method: "추정분할", levels: "5", average: "" };
+/** 화면용 과목 줄: 과목을 '직접 입력'으로 쓰는 줄인지(custom)를 함께 든다. */
+type UiRow = MinutesRow & { custom: boolean };
+const blankRow = (): UiRow => ({ ...EMPTY_ROW, custom: false });
 const ROW_FIELDS: [keyof MinutesRow, string, string][] = [
   ["grade", "학년", "w-12"],
   ["subject", "과목명", "w-28"],
@@ -96,10 +96,18 @@ export function GuideSection({ term }: { term: Term }) {
   const [attendees, setAttendees] = useState("");
   const [recorder, setRecorder] = useState("");
   const [remarks, setRemarks] = useState("");
-  const [rows, setRows] = useState<MinutesRow[]>([{ ...EMPTY_ROW }]);
+  const [rows, setRows] = useState<UiRow[]>([blankRow()]);
 
   const setRow = (i: number, key: keyof MinutesRow, value: string) =>
     setRows(rows.map((r, n) => (n === i ? { ...r, [key]: value } : r)));
+  const subjects = subjectsFor(area);
+  // 교과를 바꾸면 목록에서 고른 과목은 비운다(직접 입력한 과목은 둔다).
+  const changeArea = (value: string) => {
+    setAreaChoice(value);
+    setRows(rows.map((r) => (r.custom ? r : { ...r, subject: "" })));
+  };
+  const pickSubject = (i: number, value: string) =>
+    setRows(rows.map((r, n) => (n === i ? (value === OTHER_AREA ? { ...r, custom: true, subject: "" } : { ...r, custom: false, subject: value }) : r)));
 
   const guideFile = (kind: "first" | "second") =>
     kind === "first"
@@ -149,7 +157,7 @@ export function GuideSection({ term }: { term: Term }) {
         <div className="grid gap-2 text-sm sm:grid-cols-2">
           <label className="flex items-center gap-2">
             교과
-            <select className={`${field} flex-1`} value={areaChoice} onChange={(e) => setAreaChoice(e.target.value)}>
+            <select className={`${field} flex-1`} value={areaChoice} onChange={(e) => changeArea(e.target.value)}>
               <option value="">교과를 선택하세요</option>
               {AREAS.map((a) => (
                 <option key={a} value={a}>
@@ -199,16 +207,44 @@ export function GuideSection({ term }: { term: Term }) {
           <p className="text-sm font-semibold">과목별 출제·검토 교사와 분할점수 산출 여부</p>
           {rows.map((r, i) => (
             <div key={i} className="flex items-center gap-1 text-sm">
-              {ROW_FIELDS.map(([key, label, w]) => (
-                <input
-                  key={key}
-                  aria-label={label}
-                  placeholder={label}
-                  className={`${field} ${w}`}
-                  value={r[key]}
-                  onChange={(e) => setRow(i, key, e.target.value)}
-                />
-              ))}
+              {ROW_FIELDS.map(([key, label, w]) =>
+                key === "subject" && subjects.length > 0 ? (
+                  <span key={key} className="flex items-center gap-1">
+                    <select
+                      aria-label={label}
+                      className={`${field} w-32`}
+                      value={r.custom ? OTHER_AREA : r.subject}
+                      onChange={(e) => pickSubject(i, e.target.value)}
+                    >
+                      <option value="">과목 선택</option>
+                      {subjects.map((name) => (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                      <option value={OTHER_AREA}>{OTHER_AREA}</option>
+                    </select>
+                    {r.custom && (
+                      <input
+                        aria-label="과목명 직접 입력"
+                        placeholder="과목명"
+                        className={`${field} w-28`}
+                        value={r.subject}
+                        onChange={(e) => setRow(i, "subject", e.target.value)}
+                      />
+                    )}
+                  </span>
+                ) : (
+                  <input
+                    key={key}
+                    aria-label={label}
+                    placeholder={label}
+                    className={`${field} ${w}`}
+                    value={r[key]}
+                    onChange={(e) => setRow(i, key, e.target.value)}
+                  />
+                ),
+              )}
               {rows.length > 1 && (
                 <button className="text-gray-500 underline" onClick={() => setRows(rows.filter((_, n) => n !== i))}>
                   삭제
@@ -216,7 +252,7 @@ export function GuideSection({ term }: { term: Term }) {
               )}
             </div>
           ))}
-          <button className="rounded-md border border-gray-300 bg-white px-3 py-1 text-sm" onClick={() => setRows([...rows, { ...EMPTY_ROW }])}>
+          <button className="rounded-md border border-gray-300 bg-white px-3 py-1 text-sm" onClick={() => setRows([...rows, blankRow()])}>
             과목 줄 추가
           </button>
         </div>
@@ -235,7 +271,9 @@ export function GuideSection({ term }: { term: Term }) {
                 place,
                 attendees,
                 recorder,
-                rows: rows.filter((r) => Object.values(r).some((v) => v.trim() !== "" && v !== EMPTY_ROW.exam && v !== EMPTY_ROW.method && v !== EMPTY_ROW.levels)),
+                rows: rows
+                  .filter((r) => ROW_FIELDS.some(([k]) => r[k].trim() !== "" && r[k] !== EMPTY_ROW[k]))
+                  .map((r) => Object.fromEntries(ROW_FIELDS.map(([k]) => [k, r[k]])) as MinutesRow),
                 remarks,
               });
               saveFile(bytes, safeName(`${area.trim()}과 회의록(${year}학년도 ${semester}학기 ${exam}차 정기시험).hwpx`));
