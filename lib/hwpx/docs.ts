@@ -1,8 +1,8 @@
 import { children, descendants, first, removeAll } from "./dom.ts";
 import { openPackage, savePackage, type Pkg } from "./package.ts";
 import type { ParsedGroup } from "./data.ts";
-import { buildTable, cellAt, F4, F5, PERF, tablesOf, type SpecGroup, type TableSpec } from "./tables.ts";
-import { replaceAll, setCellText, setParagraphText } from "./text.ts";
+import { buildTable, cellAt, F4, F5, PERF4, PERF5, tablesOf, type SpecGroup, type TableSpec } from "./tables.ts";
+import { paragraphText, replaceAll, replaceInParagraph, setCellText, setParagraphText } from "./text.ts";
 
 export const YEARS = [2026, 2027, 2028] as const;
 export type Semester = 1 | 2;
@@ -122,21 +122,18 @@ const groupLines = (kind: string) => ["성취수준별", kind, "분할점수"];
 function specFor(o: NoticeOptions, g: GradeData): TableSpec {
   const labels = g.grade === 1 ? LABELS5 : LABELS4;
   const s = o.semester;
+  const rowsOf = (x: ParsedGroup) => x.rows.map((r) => ({ name: r.name, lead: r.lead, values: r.values }));
   if (o.kind === "perf") {
-    const rows = g.groups.flatMap((x) => x.rows);
     return {
-      titles: [{ title: `${s}학기 수행평가`, labels }],
+      titles: [{ title: `${s}학기 수행평가 분할점수(단위: 점)`, labels }],
       leadLabel: "만점",
-      groups: [{ rows: rows.map((r) => ({ name: r.name, lead: r.lead, values: r.values })) }],
+      groups: g.groups.map((x) => ({ lines: [`성취수준별 ${x.kind} 분할점수`], rows: rowsOf(x) })),
     };
   }
-  const groups: SpecGroup[] = g.groups.map((x) => ({
-    lines: groupLines(x.kind === "추정" ? "추정" : "고정"),
-    rows: x.rows.map((r) => ({ name: r.name, values: r.values })),
-  }));
+  const groups: SpecGroup[] = g.groups.map((x) => ({ lines: groupLines(x.kind), rows: rowsOf(x) }));
   const titles =
     o.kind === "first"
-      ? [{ title: `${s}학기 1차 정기시험`, labels }]
+      ? [{ title: `${s}학기 1차 정기시험 분할점수(단위: 점)`, labels }]
       : [
           { title: `${s}학기 2차 정기시험`, labels },
           { title: `${s}학기 학기말`, labels },
@@ -156,38 +153,64 @@ function paragraphOf(el: Element): Element {
 function fillTables(pkg: Pkg, o: NoticeOptions): Element[] {
   const doc = pkg.section;
   const tables = tablesOf(doc);
-  const targets = [tables[2], tables[3], tables[4]];
   const perf = o.kind === "perf";
-  const templates = perf ? [PERF, PERF, PERF] : [F5, F4, F4];
-  const templateTbls = perf ? [tables[2], tables[2], tables[2]] : [tables[2], tables[3], tables[3]];
-  const made: Element[] = [];
-  // 템플릿 표는 바꾸기 전 복사본에서 본뜬다.
-  const frozen = templateTbls.map((t) => t.cloneNode(true) as Element);
-  targets.forEach((target, i) => {
+  // 표 순서: 0 머리글, 1 제목, 2·3·4 학년별 자료(수행평가는 2·3학년 표만 있다), 마지막 날짜·직인
+  const targets = perf ? [tables[2], tables[3]] : [tables[2], tables[3], tables[4]];
+  const families = perf ? [PERF5, PERF4] : [F5, F4, F4];
+  const sources = perf ? [tables[2], tables[3]] : [tables[2], tables[3], tables[3]];
+  // 서식 표는 바꾸기 전 복사본에서 본뜬다.
+  const frozen = sources.map((t) => t.cloneNode(true) as Element);
+  return targets.map((target, i) => {
     const g = o.grades.find((x) => x.grade === i + 1);
     if (!g) throw new Error(`${i + 1}학년 자료가 없어요.`);
-    const built = buildTable(frozen[i], templates[i], specFor(o, g), nextId());
+    const built = buildTable(frozen[i], families[i], specFor(o, g), nextId());
     target.parentNode!.replaceChild(built, target);
-    made.push(built);
+    return built;
   });
-  return made;
 }
 
+/** 서식 파일이 만들어진 학년도·학기와 공지일(글자 치환의 기준) */
+const NOTICE_BASE = { year: 2026, semester: 2, date: "2026. 10. 1." };
+
 function noticeTextPairs(o: NoticeOptions): [string, string][] {
-  const d = `${o.date.year}. ${o.date.month}. ${o.date.day}.`;
   const pairs: [string, string][] = [
-    ["2025학년도", `${o.year}학년도`],
-    ["2학기", `${o.semester}학기`],
-    ["2025. 9. 22.", d],
+    [`${NOTICE_BASE.year}학년도`, `${o.year}학년도`],
+    [`${NOTICE_BASE.semester}학기`, `${o.semester}학기`],
+    [NOTICE_BASE.date, `${o.date.year}. ${o.date.month}. ${o.date.day}.`],
   ];
-  if (o.kind !== "perf") pairs.splice(2, 0, ["지필평가", "정기시험"]);
-  if (o.kind === "term") pairs.splice(3, 0, ["1차 정기시험", "2차 정기시험 및 학기말"]);
+  if (o.kind === "term") pairs.push(["1차 정기시험", "2차 정기시험 및 학기말"]);
   return pairs;
+}
+
+/** 수행평가 공지에는 3학년 표가 없고 안내 문구만 있다. 3학년 자료를 주면 2학년 표 구성을 본떠 표를 추가한다. */
+function addPerfGrade3(pkg: Pkg, o: NoticeOptions, grade2Template: Element): void {
+  const g = o.grades.find((x) => x.grade === 3);
+  if (!g || g.groups.length === 0) return;
+  const doc = pkg.section;
+  const root = doc.documentElement;
+  const tables = tablesOf(doc);
+  const paras = children(root, "p");
+  const tablePara = paragraphOf(tables[3]);
+  const at = paras.indexOf(tablePara);
+  const heading = paras[at - 1];
+  const note = paras[at + 1];
+  const newHeading = heading.cloneNode(true) as Element;
+  replaceInParagraph(newHeading, "2학년", "3학년");
+  const newTablePara = tablePara.cloneNode(true) as Element;
+  const oldTbl = descendants(newTablePara, "tbl")[0];
+  const built = buildTable(grade2Template, PERF4, specFor(o, g), nextId());
+  oldTbl.parentNode!.replaceChild(built, oldTbl);
+  root.insertBefore(newHeading, note);
+  root.insertBefore(newTablePara, note);
+  if (paragraphText(note).includes("3학년은 전 과목 고정분할")) root.removeChild(note);
 }
 
 export async function buildNotice(data: ArrayBuffer | Uint8Array, o: NoticeOptions): Promise<Uint8Array> {
   const pkg = await openPackage(data);
+  // 3학년 표는 2학년 표 서식을 본뜨므로, 2학년 표가 바뀌기 전의 원본을 보관해 둔다.
+  const grade2Template = o.kind === "perf" ? (tablesOf(pkg.section)[3].cloneNode(true) as Element) : null;
   fillTables(pkg, o);
+  if (grade2Template) addPerfGrade3(pkg, o, grade2Template);
   replaceAll(pkg.section, noticeTextPairs(o));
   return savePackage(pkg);
 }
@@ -198,7 +221,7 @@ export async function buildMeeting(data: ArrayBuffer | Uint8Array, o: Omit<Notic
   const doc = pkg.section;
   const root = doc.documentElement;
   const made = fillTables(pkg, o);
-  replaceAll(doc, noticeTextPairs(o).filter(([from]) => !from.includes(". ")));
+  replaceAll(doc, noticeTextPairs(o));
 
   const paras = children(root, "p");
   const index = (el: Element) => paras.indexOf(paragraphOf(el));

@@ -8,7 +8,7 @@ Object.assign(globalThis, { DOMParser: XmlDomParser, XMLSerializer: XmlSerialize
 
 const { children, descendants, first, parseXml } = await import("./dom.ts");
 const { replaceInParagraph, paragraphText } = await import("./text.ts");
-const { buildTable, tablesOf, F4, F5, PERF } = await import("./tables.ts");
+const { buildTable, tablesOf, F4, F5, PERF4, PERF5 } = await import("./tables.ts");
 const { openPackage } = await import("./package.ts");
 const docs = await import("./docs.ts");
 const { parseCutoffText } = await import("./data.ts");
@@ -71,7 +71,8 @@ test("원본과 같은 자료로 만든 표는 원본 표와 같다(칸 위치·
   const cases: [string, number, typeof F4][] = [
     ["notice-written", 3, F4],
     ["notice-written", 2, F5],
-    ["notice-perf", 2, PERF],
+    ["notice-perf", 2, PERF5],
+    ["notice-perf", 3, PERF4],
   ];
   for (const [name, idx, family] of cases) {
     const doc = await sectionOf(tpl(name));
@@ -155,8 +156,19 @@ test("가정통신문 3종과 회의 자료: 표가 온전하고 글자가 바�
     const cols = grids.map((t) => Number(t.getAttribute("colCnt")));
     if (kind === "first") assert.deepEqual(cols, [7, 6, 6]);
     if (kind === "term") assert.deepEqual(cols, [12, 10, 10]);
-    if (kind === "perf") assert.deepEqual(cols, [7, 6, 6]);
+    if (kind === "perf") {
+      assert.deepEqual(cols, [8, 7, 7]);
+      assert.ok(!text.includes("전 과목 고정분할"), "3학년 자료를 줬는데 안내 문구가 남아 있어요");
+      assert.ok(text.includes("2027학년도 1학기 3학년 수행평가"));
+    }
   }
+  // 수행평가에서 3학년 자료가 없으면 표는 2개이고 '전 과목 고정분할' 안내 문구가 남는다.
+  const noThird = await docs.buildNotice(tpl("notice-perf"), {
+    year: 2027, semester: 1, kind: "perf", grades: gradesFor("perf").slice(0, 2), date,
+  });
+  const noThirdDoc = await sectionOf(noThird);
+  assert.deepEqual(tablesOf(noThirdDoc).filter((t) => Number(t.getAttribute("colCnt")) > 5).map((t) => Number(t.getAttribute("colCnt"))), [8, 7]);
+  assert.ok(allText(noThirdDoc).includes("2027학년도 1학기 3학년은 전 과목 고정분할"));
   for (const kind of ["first", "term"] as const) {
     const bytes = await docs.buildMeeting(tpl("notice-written"), { year: 2027, semester: 2, kind, grades: gradesFor(kind), date });
     const doc = await sectionOf(bytes);

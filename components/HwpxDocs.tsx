@@ -268,13 +268,17 @@ export function NoticeSection({ term }: { term: Term }) {
     const empty = texts[kind][grade].trim() === "";
     return { grade, parsed, empty };
   });
-  const ready = grades.every((g) => !g.empty && g.parsed.errors.length === 0 && g.parsed.groups.length > 0);
+  // 수행평가 공지는 3학년 표가 없는 서식이라, 3학년은 비워 두면 '전 과목 고정분할' 안내 문구가 그대로 들어간다.
+  const optional = (g: { grade: number }) => kind === "perf" && g.grade === 3;
+  const ready = grades.every((g) =>
+    optional(g) && g.empty ? true : !g.empty && g.parsed.errors.length === 0 && g.parsed.groups.length > 0,
+  );
 
   const noticeDate = () => {
     const [y, m, d] = resolveDate(date).split("-").map(Number);
     return { year: y, month: m, day: d };
   };
-  const gradeData = () => grades.map((g) => ({ grade: g.grade, groups: g.parsed.groups }));
+  const gradeData = () => grades.filter((g) => !g.empty).map((g) => ({ grade: g.grade, groups: g.parsed.groups }));
 
   return (
     <div className="space-y-4">
@@ -304,7 +308,7 @@ export function NoticeSection({ term }: { term: Term }) {
         {grades.map(({ grade, parsed, empty }) => (
           <div key={grade} className="space-y-1">
             <label className="text-sm font-semibold" htmlFor={`g${grade}`}>
-              {grade}학년
+              {grade}학년{kind === "perf" && grade === 3 ? " (선택: 비우면 '전 과목 고정분할' 안내 문구)" : ""}
             </label>
             <textarea
               id={`g${grade}`}
@@ -357,11 +361,15 @@ export function NoticeSection({ term }: { term: Term }) {
           </button>
         </div>
         {kind === "perf" && <p className="text-xs text-gray-500">수행평가는 회의 자료 서식이 없어서 가정통신문만 만들어요.</p>}
-        {!ready && <p className="text-xs text-gray-500">세 학년 모두 올바르게 붙여넣으면 내려받을 수 있어요.</p>}
+        {!ready && (
+          <p className="text-xs text-gray-500">
+            {kind === "perf" ? "1·2학년을" : "세 학년을 모두"} 올바르게 붙여넣으면 내려받을 수 있어요.
+          </p>
+        )}
         <Message message={notice.message} />
         <Message message={meeting.message} />
         <p className="text-xs text-gray-500">
-          서식은 올려주신 가정통신문 파일을 틀로 써요. 학교 이름, 인사말, 참고 내용은 틀 그대로입니다. 학업성적관리회의 자료는 원본이 없어
+          서식은 2026학년도 2학기 가정통신문 파일을 틀로 써요. 학교 이름, 인사말, 참고 내용은 틀 그대로입니다. 학업성적관리회의 자료는 원본이 없어
           가정통신문의 표 서식으로 만들었고, 줄 간격과 글꼴이 학교에서 쓰던 PDF와 조금 다를 수 있어요.
         </p>
       </section>
