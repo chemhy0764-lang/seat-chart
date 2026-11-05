@@ -16,6 +16,7 @@ import {
 import { loadTemplate, safeName, saveFile } from "@/lib/hwpx/client";
 import { latestPlan } from "@/lib/plans/api";
 import { courseNames, findCourse, type Course } from "@/lib/plans/curriculum";
+import { tidySubjectNames } from "@/lib/plans/names";
 import type { SubjectPlan } from "@/lib/plans/pdf";
 import { examValueOf } from "@/lib/plans/subjectsText";
 import { AREAS, OTHER as OTHER_AREA, canonicalSubject, subjectsFor } from "@/lib/subjects";
@@ -481,9 +482,12 @@ export function NoticeSection({ term }: { term: Term }) {
       const next = { ...texts[kind] };
       for (const g of [1, 2, 3] as const) {
         const plan = await latestPlan("cutoffs", String(g), year, semester);
-        const text = plan ? String(((plan.parsed as { texts?: Partial<Record<NoticeKind, string>> }).texts ?? {})[kind] ?? "") : "";
-        if (plan && text.trim() !== "") {
-          next[g] = text;
+        const raw = plan ? String(((plan.parsed as { texts?: Partial<Record<NoticeKind, string>> }).texts ?? {})[kind] ?? "") : "";
+        if (plan && raw.trim() !== "") {
+          // PDF에서 벌어진 과목 이름의 띄어쓰기는 편제표(있으면)와 과목 목록의 표기로 바로잡는다.
+          const curriculum = await latestPlan("curriculum", String(g), year, semester);
+          const known = ((curriculum?.parsed as { courses?: Course[] } | undefined)?.courses ?? []).map((c) => c.subject);
+          next[g] = tidySubjectNames(raw, known);
           found.push(`${g}학년 ${plan.version}판`);
         } else {
           missing.push(`${g}학년`);
