@@ -47,3 +47,8 @@ test("올린 협의록의 과목 이름을 목록의 표기에 맞춘다", () =>
   assert.deepEqual(canonicalSubject("없는과목", "수학"), { name: "없는과목", inList: false });
 });
 
+
+test("스포츠 생활1(2학년)과 스포츠 생활(3학년)은 서로 다른 과목으로 목록에 있다", () => {
+  assert.deepEqual(canonicalSubject("스포츠생활1", "예체능"), { name: "스포츠 생활1", inList: true });
+  assert.deepEqual(canonicalSubject("스포츠 생활", "예체능"), { name: "스포츠 생활", inList: true });
+});

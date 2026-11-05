@@ -55,6 +55,7 @@ before(async () => {
     insert into auth.users values ('${ADMIN}'), ('${TEACHER}'), ('${OTHER}');
   `);
   await db.exec(readFileSync(new URL("../../supabase/migrations/20261105010000_plan_uploads.sql", import.meta.url), "utf8"));
+  await db.exec(readFileSync(new URL("../../supabase/migrations/20261105020000_curriculum_uploads.sql", import.meta.url), "utf8"));
   await db.query("insert into public.admins (user_id) values ($1)", [ADMIN]);
 });
 
@@ -130,4 +131,25 @@ test("파일 저장소: 관리자만 올리고, 로그인한 사용자는 읽고
   await as("anon");
   assert.equal(await count("storage.objects"), 0);
   await rejects(() => put("minutes/g.hwpx"));
+});
+
+test("편제표(curriculum, hwp): 관리자만 올리고 로그인한 사용자는 읽는다", async () => {
+  const curriculum = (by: string) =>
+    db.query(
+      `insert into public.plan_uploads (kind, scope, year, semester, version, file_path, file_name, file_type, uploaded_by)
+       values ('curriculum', '1', 2026, 2, 1, 'curriculum/a.hwp', '편제표.hwp', 'hwp', $1)`,
+      [by],
+    );
+  await as("authenticated", TEACHER);
+  await rejects(() => curriculum(TEACHER));
+  await as("authenticated", ADMIN);
+  await curriculum(ADMIN);
+  await rejects(() => db.query("delete from public.plan_uploads where kind = 'curriculum'"));
+  await as("authenticated", TEACHER);
+  assert.equal((await db.query<{ c: number }>("select count(*)::int c from public.plan_uploads where kind = 'curriculum'")).rows[0].c, 1);
+  await as("authenticated", ADMIN);
+  await db.query("insert into storage.objects (bucket_id, name) values ('plans', 'curriculum/b.hwp')");
+  await rejects(() => db.query("insert into storage.objects (bucket_id, name) values ('plans', 'curriculum/c.exe')"));
+  await as("authenticated", TEACHER);
+  await rejects(() => db.query("insert into storage.objects (bucket_id, name) values ('plans', 'curriculum/d.hwp')"));
 });

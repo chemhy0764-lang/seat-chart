@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { parseCutoffText } from "@/lib/hwpx/data";
 import {
   buildGuide,
@@ -15,6 +15,7 @@ import {
 } from "@/lib/hwpx/docs";
 import { loadTemplate, safeName, saveFile } from "@/lib/hwpx/client";
 import { latestPlan } from "@/lib/plans/api";
+import { courseNames, findCourse, type Course } from "@/lib/plans/curriculum";
 import type { SubjectPlan } from "@/lib/plans/pdf";
 import { examValueOf } from "@/lib/plans/subjectsText";
 import { AREAS, OTHER as OTHER_AREA, canonicalSubject, subjectsFor } from "@/lib/subjects";
@@ -70,7 +71,7 @@ const resolveDate = (date: string) => {
 
 const EMPTY_ROW: MinutesRow = { grade: "", subject: "", writer: "", reviewer: "", exam: "1, 2차", method: "추정분할", levels: "5", average: "" };
 /** 화면용 과목 줄: 과목을 '직접 입력'으로 쓰는 줄인지(custom)를 함께 든다. */
-type UiRow = MinutesRow & { custom: boolean };
+type UiRow = MinutesRow & { custom: boolean; /** 편제표로 과목명·성취도 단계를 맞춘 '학년|과목'. 사용자가 단계를 고쳐도 같은 과목이면 다시 덮어쓰지 않는다. */ lv?: string };
 const blankRow = (): UiRow => ({ ...EMPTY_ROW, custom: false });
 const ROW_FIELDS: [keyof MinutesRow, string, string][] = [
   ["grade", "학년", "w-20"],
@@ -110,7 +111,56 @@ export function GuideSection({ term }: { term: Term }) {
 
   const setRow = (i: number, key: keyof MinutesRow, value: string) =>
     setRows(rows.map((r, n) => (n === i ? { ...r, [key]: value } : r)));
-  const subjects = subjectsFor(area);
+  // 편제표(학년별 hwp)에서 읽은 과목. 올라온 학년이 있으면 그 과목을 선택지로 쓰고 성취도 단계를 채운다.
+  const [curr, setCurr] = useState<Partial<Record<string, Course[]>>>({});
+  const filledArea = useRef("");
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const found = await Promise.all(["1", "2", "3"].map(async (g) => [g, await latestPlan("curriculum", g, year, semester)] as const));
+        if (!alive) return;
+        const next: Partial<Record<string, Course[]>> = {};
+        for (const [g, plan] of found) {
+          const c = (plan?.parsed as { courses?: Course[] } | undefined)?.courses;
+          if (Array.isArray(c) && c.length > 0) next[g] = c;
+        }
+        setCurr(next);
+      } catch {
+        if (alive) setCurr({});
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [year, semester]);
+  const hasCurr = Object.keys(curr).length > 0;
+  /** 과목 선택지: 편제표에 이 교과의 과목이 있으면 편제표대로(학년을 고른 줄은 그 학년만), 없으면 고정 목록. */
+  const optionsFor = (grade: string): string[] => {
+    const fromCurr = courseNames(curr, areaChoice, grade);
+    return fromCurr.length > 0 ? fromCurr : subjectsFor(area);
+  };
+  // 편제표가 올라와 있으면 과목 줄을 편제표와 맞춘다: 과목 줄이 비어 있으면 이 교과의 과목으로 채우고, 과목명 표기와 성취도 단계를 편제표대로 한다.
+  useEffect(() => {
+    if (!areaChoice || areaChoice === OTHER_AREA || !hasCurr) return;
+    let next = rows;
+    if (filledArea.current !== areaChoice && rows.length === 1 && !rows[0].subject && !rows[0].grade) {
+      const fromCurr: UiRow[] = ["1", "2", "3"].flatMap((g) =>
+        (curr[g] ?? []).filter((c) => c.area === areaChoice).map((c) => ({ ...EMPTY_ROW, grade: g, subject: c.subject, levels: c.levels || EMPTY_ROW.levels, custom: false, lv: `${g}|${c.subject}` })),
+      );
+      if (fromCurr.length > 0) {
+        next = fromCurr;
+        filledArea.current = areaChoice;
+      }
+    }
+    next = next.map((r) => {
+      const c = findCourse(curr, r.grade, areaChoice, r.subject);
+      const key = c ? `${r.grade}|${c.subject}` : "";
+      if (!c || r.lv === key) return r;
+      return { ...r, subject: c.subject, custom: false, levels: c.levels || r.levels, lv: key };
+    });
+    if (next.length !== rows.length || next.some((r, i) => r !== rows[i])) setRows(next);
+  }, [areaChoice, curr, hasCurr, rows]);
   const [planNote, setPlanNote] = useState<{ ok: boolean; text: string } | null>(null);
   // 교과(또는 학기)를 고르면 올린 협의록에서 장소·참석자·기록자와 과목 줄을 자동으로 채운다. 따로 누를 버튼은 없다.
   useEffect(() => {
@@ -153,6 +203,7 @@ export function GuideSection({ term }: { term: Term }) {
   // 교과를 바꾸면 이전 교과의 장소·참석자·기록자·과목 줄을 비운다(올린 협의록이 있으면 곧바로 새로 채워진다).
   const changeArea = (value: string) => {
     setAreaChoice(value);
+    filledArea.current = "";
     setPlanNote(null);
     setPlace("");
     setAttendees("");
@@ -256,7 +307,12 @@ export function GuideSection({ term }: { term: Term }) {
           </label>
         </div>
 
-        <p className="text-xs text-gray-500">교과를 고르면 올린 협의록에서 장소·참석자·기록자·과목이 자동으로 채워져요.</p>
+        <p className="text-xs text-gray-500">
+          교과를 고르면 올린 협의록에서 장소·참석자·기록자·과목이 자동으로 채워져요.
+          {hasCurr
+            ? ` 과목명 선택지와 성취도 단계는 편제표(${Object.keys(curr).sort().join("·")}학년)대로 채워요.`
+            : " '편제표' 탭에 학년별 편제표를 올리면 과목명 선택지와 성취도 단계도 자동으로 채워져요."}
+        </p>
         {planNote && (
           <p className={`rounded-md p-2 text-sm ${planNote.ok ? "bg-emerald-50 text-emerald-900" : "bg-amber-50 text-amber-900"}`}>{planNote.text}</p>
         )}
@@ -295,7 +351,7 @@ export function GuideSection({ term }: { term: Term }) {
                       </option>
                     ))}
                   </select>
-                ) : key === "subject" && subjects.length > 0 ? (
+                ) : key === "subject" && optionsFor(r.grade).length > 0 ? (
                   <span key={key} className="flex items-center gap-1">
                     <select
                       aria-label={label}
@@ -304,7 +360,7 @@ export function GuideSection({ term }: { term: Term }) {
                       onChange={(e) => pickSubject(i, e.target.value)}
                     >
                       <option value="">과목 선택</option>
-                      {subjects.map((name) => (
+                      {[...optionsFor(r.grade), ...(r.subject && !r.custom && !optionsFor(r.grade).includes(r.subject) ? [r.subject] : [])].map((name) => (
                         <option key={name} value={name}>
                           {name}
                         </option>
