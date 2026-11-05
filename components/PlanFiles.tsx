@@ -4,10 +4,11 @@ import { useEffect, useState } from "react";
 import DropZone from "@/components/DropZone";
 import { parseCutoffText } from "@/lib/hwpx/data";
 import { valueCountFor, type NoticeKind, type Term } from "@/lib/hwpx/docs";
-import { fetchIsAdmin, listPlans, savePlan, signedUrl, type PlanKind, type PlanRow } from "@/lib/plans/api";
+import { fetchIsAdmin, latestPlan, listPlans, savePlan, signedUrl, type PlanKind, type PlanRow } from "@/lib/plans/api";
 import { EXAM_KINDS, EXAM_LABELS } from "@/lib/plans/exams";
 import { extractFromFile, fileTypeOf } from "@/lib/plans/extract";
 import { guessCutoffKind } from "@/lib/plans/neis";
+import { tidySubjectNames } from "@/lib/plans/names";
 import type { SubjectPlan } from "@/lib/plans/pdf";
 import { parseSubjectsText, subjectsToText } from "@/lib/plans/subjectsText";
 import { AREAS, matchArea } from "@/lib/subjects";
@@ -184,13 +185,24 @@ function PlanSection({
       found.push(`파일은 ${result.year}학년도 ${result.semester}학기 자료로 보여요. 위에서 고른 ${year}학년도 ${semester}학기와 달라요. 학기를 맞춘 뒤 올려 주세요.`);
     }
     let texts: Record<NoticeKind, string> | undefined;
+    // 과목 이름의 띄어쓰기를 바로잡을 때 쓸 편제표의 과목 이름(올라온 편제표가 없으면 고정 목록만 쓴다)
+    let known: string[] = [];
+    if (!isMinutes && result.cutoffTexts) {
+      try {
+        const g = String(result.grade ?? form.scope);
+        const curriculum = await latestPlan("curriculum", g, year, semester);
+        known = ((curriculum?.parsed as { courses?: { subject: string }[] } | undefined)?.courses ?? []).map((c) => c.subject);
+      } catch {
+        known = [];
+      }
+    }
     if (!isMinutes) {
       if (result.grade) {
         scope = String(result.grade);
         found.push(`NEIS 표에서 ${result.grade}학년으로 읽어 선택했어요.`);
       }
       if (result.cutoffTexts) {
-        texts = { ...result.cutoffTexts };
+        texts = Object.fromEntries(EXAM_KINDS.map((k) => [k, tidySubjectNames(result.cutoffTexts![k], known)])) as Record<NoticeKind, string>;
         const filled = EXAM_KINDS.filter((k) => texts![k] !== "").map((k) => EXAM_LABELS[k]);
         found.push(`${filled.join(", ")} 표를 읽었어요. 이 표에는 추정분할 과목만 있어요. 고정분할 과목은 해당 칸에 '고정' 줄을 만들어 직접 넣어 주세요.`);
       } else if (result.cutoffText) {
