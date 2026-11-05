@@ -17,3 +17,10 @@ npm test        # 자리 배치 로직 테스트
 ```
 
 DB 변경은 `supabase/migrations/`, 되돌리기는 `supabase/rollback.sql` 에 있습니다.
+
+## Supabase 무료 플랜이 일시 중지될 때
+
+무료 플랜은 약 1주일 접속이 없으면 프로젝트가 일시 중지되어 로그인과 가입이 `Failed to fetch`로 실패합니다.
+
+- 예방: `vercel.json`의 Cron이 하루 한 번 `/api/keepalive`를 호출해 데이터베이스에 가벼운 요청(`ping()` 함수)을 보냅니다. `supabase/migrations/20261105000000_add_ping.sql`을 한 번 실행해 두어야 합니다.
+- 이미 중지되었다면: Supabase 대시보드에서 프로젝트의 "Resume project"(한국어 번역으로는 "이력서 프로젝트")를 눌러 다시 시작합니다. 중지 후 일정 기간 안에만 가능합니다.
