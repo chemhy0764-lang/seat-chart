@@ -1,5 +1,5 @@
 import { children, descendants, first, removeAll } from "./dom.ts";
-import { openPackage, savePackage, type Pkg } from "./package.ts";
+import { blackenRedText, openPackage, savePackage, type Pkg } from "./package.ts";
 import type { ParsedGroup } from "./data.ts";
 import { buildTable, cellAt, F4, F5, PERF4, PERF5, T10, T12, tablesOf, type SpecGroup, type TableSpec } from "./tables.ts";
 import { paragraphText, replaceAll, replaceInParagraph, setCellText, setParagraphText } from "./text.ts";
@@ -64,7 +64,7 @@ const MIN_DATA_ROWS = 10;
 export async function buildMinutes(data: ArrayBuffer | Uint8Array, o: MinutesOptions): Promise<Uint8Array> {
   const pkg = await openPackage(data);
   const doc = pkg.section;
-  replaceAll(doc, [["( 00 )과", `( ${o.subjectArea} )과`]]);
+  replaceAll(doc, [["( 00 )과 회의록", `( ${o.subjectArea} ) 교과협의록`]]);
 
   const [head, list] = tablesOf(doc);
   setCellText(cellAt(head, [1, 1]), [o.dateText]);
@@ -96,6 +96,7 @@ export async function buildMinutes(data: ArrayBuffer | Uint8Array, o: MinutesOpt
   first(list, "sz")?.setAttribute("height", String(headH + rowH * total));
   const zones = first(list, "cellzoneList");
   if (zones) for (const z of children(zones, "cellzone")) z.setAttribute("endRowAddr", String(total));
+  await blackenRedText(pkg); // 서식에서 입력값이 빨갛게 표시된 글자를 모두 검은색으로
   return savePackage(pkg);
 }
 
