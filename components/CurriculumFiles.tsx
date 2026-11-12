@@ -30,7 +30,7 @@ function summary(courses: Course[]): string {
 }
 
 type Form = { scope: string; file: File | null; text: string; note: string; base: PlanRow | null };
-const blank = (): Form => ({ scope: "1", file: null, text: "", note: "", base: null });
+const blank = (grade: string): Form => ({ scope: grade, file: null, text: "", note: "", base: null });
 
 /** 학년별 편제표(NEIS '학교교육과정 편제 및 시간배당 관리 보고서', hwp)를 올리는 탭. 관리자만 올리고, 정정은 새 판으로 남긴다. */
 export default function CurriculumFiles({ term, embedded = false, refreshKey = 0 }: { term: Term; embedded?: boolean; refreshKey?: number }) {
@@ -39,7 +39,9 @@ export default function CurriculumFiles({ term, embedded = false, refreshKey = 0
   const [rows, setRows] = useState<PlanRow[]>([]);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
-  const [form, setForm] = useState<Form>(blank());
+  /** 지금 열어 둔 학년 탭. 올리는 파일은 이 학년의 편제표로 저장한다. */
+  const [grade, setGrade] = useState("1");
+  const [form, setForm] = useState<Form>(blank("1"));
   const [notes, setNotes] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
@@ -64,7 +66,14 @@ export default function CurriculumFiles({ term, embedded = false, refreshKey = 0
   }, [year, semester, reload, refreshKey]);
 
   const parsedText = parseCoursesText(form.text);
-  const hasPrevious = rows.some((r) => r.scope === form.scope);
+  const hasPrevious = rows.some((r) => r.scope === grade);
+  const gradeRows = rows.filter((r) => r.scope === grade);
+  const changeGrade = (g: string) => {
+    setGrade(g);
+    setForm(blank(g));
+    setNotes([]);
+    setMessage(null);
+  };
 
   async function chooseFile(file: File | null, lead?: string) {
     set({ file });
@@ -86,12 +95,17 @@ export default function CurriculumFiles({ term, embedded = false, refreshKey = 0
       if (cur.semester && cur.semester !== semester) {
         found.push(`파일은 ${cur.semester}학기 편제표로 보여요. 위에서 고른 ${year}학년도 ${semester}학기와 달라요. 학기를 맞춘 뒤 올려 주세요.`);
       }
-      if (cur.grade) found.push(`${cur.grade}학년으로 읽어 선택했어요.`);
+      if (cur.grade !== null && String(cur.grade) !== grade) {
+        // 탭으로 학년을 정했으므로, 다른 학년의 편제표는 저장하지 않는다.
+        setNotes([`이 파일은 ${cur.grade}학년 편제표로 보여요. ${grade}학년 탭이 아니라 ${cur.grade}학년 탭에서 올려 주세요.`]);
+        set({ file: null });
+        return;
+      }
       setNotes(found);
-      const next: Form = { ...form, file, scope: form.base ? form.scope : cur.grade ? String(cur.grade) : form.scope, text: cur.courses.length > 0 ? coursesToText(cur.courses) : form.text };
+      const next: Form = { ...form, file, scope: grade, text: cur.courses.length > 0 ? coursesToText(cur.courses) : form.text };
       setForm(next);
-      // 학년·학기를 읽었고 학기가 맞고 과목이 있고 처음 올리는 편제표이면 바로 저장한다. 아니면 확인하고 저장 버튼을 누르게 한다.
-      if (!form.base && cur.courses.length > 0 && cur.grade !== null && (!cur.semester || cur.semester === semester) && !lead && problemOf(next) === null) {
+      // 학기가 맞고 과목이 있고 처음 올리는 편제표이면 바로 저장한다. 아니면 확인하고 저장 버튼을 누르게 한다.
+      if (!form.base && cur.courses.length > 0 && (!cur.semester || cur.semester === semester) && !lead && problemOf(next) === null) {
         await save(next);
       }
     } catch (e) {
@@ -115,7 +129,7 @@ export default function CurriculumFiles({ term, embedded = false, refreshKey = 0
     if (!f.file && !f.base) return "올릴 파일을 선택하세요.";
     if (f.text.trim() === "") return "과목이 비어 있어요.";
     if (parseCoursesText(f.text).errors.length > 0) return "과목 표의 오류를 먼저 고쳐 주세요.";
-    if (rows.some((r) => r.scope === f.scope) && f.note.trim() === "") return "이미 올린 자료가 있어요. 정정 사유를 적어 주세요.";
+    if (rows.some((r) => r.scope === grade) && f.note.trim() === "") return "이미 올린 자료가 있어요. 정정 사유를 적어 주세요.";
     return null;
   };
   const problem = problemOf(form);
@@ -136,7 +150,7 @@ export default function CurriculumFiles({ term, embedded = false, refreshKey = 0
         base: f.file ? undefined : (f.base ?? undefined),
       });
       setMessage({ ok: true, text: `${saved.scope}학년 편제표 ${saved.version}판을 저장했어요. 고치려면 목록에서 '이 판으로 정정'을 누르세요.` });
-      setForm(blank());
+      setForm(blank(grade));
       setNotes([]);
       setReload((n) => n + 1);
     } catch (e) {
@@ -160,7 +174,6 @@ export default function CurriculumFiles({ term, embedded = false, refreshKey = 0
     }
   }
 
-  const groups = GRADES.map((g) => rows.filter((r) => r.scope === g)).filter((v) => v.length > 0);
 
   return (
     <div className="space-y-4">
@@ -179,32 +192,44 @@ export default function CurriculumFiles({ term, embedded = false, refreshKey = 0
         )}
         {loadError && <p className="rounded-md bg-red-50 p-2 text-sm text-red-800">{loadError}</p>}
 
-        {groups.length === 0 ? (
-          <p className="text-sm text-gray-500">아직 올라온 편제표가 없어요.</p>
+        <div role="tablist" aria-label="학년" className="flex flex-wrap gap-2">
+          {GRADES.map((g) => {
+            const n = rows.filter((r) => r.scope === g).length;
+            return (
+              <button
+                key={g}
+                role="tab"
+                aria-selected={grade === g}
+                onClick={() => changeGrade(g)}
+                className={`rounded-md px-4 py-2 text-sm font-bold ${grade === g ? "bg-gray-800 text-white" : "border border-gray-300 bg-white"}`}
+              >
+                {g}학년 <span className={`text-xs font-normal ${grade === g ? "text-gray-200" : "text-gray-500"}`}>{n > 0 ? `✓ ${rows.find((r) => r.scope === g)?.version}판` : "없음"}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {gradeRows.length === 0 ? (
+          <p className="text-sm text-gray-500">{grade}학년 편제표가 아직 올라오지 않았어요.</p>
         ) : (
-          <div className="space-y-2">
-            {groups.map((versions) => (
-              <div key={versions[0].scope} className="rounded-md border border-gray-200 p-2 text-sm">
-                <p className="font-semibold">{versions[0].scope}학년</p>
-                {versions.map((r, i) => (
-                  <div key={r.id} className={`flex flex-wrap items-center gap-2 py-1 ${i > 0 ? "text-gray-500" : ""}`}>
-                    <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs font-semibold">
-                      {r.version}판{i === 0 ? " (현재)" : ""}
-                    </span>
-                    <span>{r.file_name}</span>
-                    <span className="text-xs text-gray-500">{when(r.uploaded_at)}</span>
-                    <span className="text-xs">과목 {coursesOf(r).length}개 · {summary(coursesOf(r))}</span>
-                    {r.note && <span className="text-xs text-amber-800">정정 사유: {r.note}</span>}
-                    <button className="rounded-md border border-gray-300 bg-white px-2 py-0.5 text-xs" onClick={() => download(r)}>
-                      내려받기
-                    </button>
-                    {admin && (
-                      <button className="rounded-md border border-gray-300 bg-white px-2 py-0.5 text-xs" onClick={() => startCorrection(r)}>
-                        이 판으로 정정
-                      </button>
-                    )}
-                  </div>
-                ))}
+          <div className="rounded-md border border-gray-200 p-2 text-sm">
+            {gradeRows.map((r, i) => (
+              <div key={r.id} className={`flex flex-wrap items-center gap-2 py-1 ${i > 0 ? "text-gray-500" : ""}`}>
+                <span className="rounded bg-gray-100 px-1.5 py-0.5 text-xs font-semibold">
+                  {r.version}판{i === 0 ? " (현재)" : ""}
+                </span>
+                <span>{r.file_name}</span>
+                <span className="text-xs text-gray-500">{when(r.uploaded_at)}</span>
+                <span className="text-xs">과목 {coursesOf(r).length}개 · {summary(coursesOf(r))}</span>
+                {r.note && <span className="text-xs text-amber-800">정정 사유: {r.note}</span>}
+                <button className="rounded-md border border-gray-300 bg-white px-2 py-0.5 text-xs" onClick={() => download(r)}>
+                  내려받기
+                </button>
+                {admin && (
+                  <button className="rounded-md border border-gray-300 bg-white px-2 py-0.5 text-xs" onClick={() => startCorrection(r)}>
+                    이 판으로 정정
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -212,29 +237,17 @@ export default function CurriculumFiles({ term, embedded = false, refreshKey = 0
 
         {admin && (
           <div className="space-y-2 rounded-md bg-gray-50 p-3 text-sm">
-            <p className="font-semibold">{form.base ? `정정: ${form.base.scope}학년 ${form.base.version}판을 바탕으로 새 판 저장` : "새 편제표 올리기"}</p>
-            <div className="flex flex-wrap items-center gap-3">
-              <label className="flex items-center gap-1">
-                학년
-                <select className={field} value={form.scope} disabled={!!form.base} onChange={(e) => set({ scope: e.target.value })}>
-                  {GRADES.map((g) => (
-                    <option key={g} value={g}>
-                      {g}학년
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {form.base && (
-                <button className="text-gray-500 underline" onClick={() => setForm(blank())}>
-                  정정 취소
-                </button>
-              )}
-            </div>
+            <p className="font-semibold">{form.base ? `정정: ${grade}학년 ${form.base.version}판을 바탕으로 새 판 저장` : `${grade}학년 편제표 올리기`}</p>
+            {form.base && (
+              <button className="text-gray-500 underline" onClick={() => setForm(blank(grade))}>
+                정정 취소
+              </button>
+            )}
             <p className="text-xs text-gray-500">
               파일을 올리면 내용을 읽고, 처음 올리는 편제표이면 바로 저장해요. 이미 올린 자료가 있으면 정정 사유를 적고 저장을 눌러 주세요. 저장한 자료는 &apos;이 판으로 정정&apos;으로
               고치기 전까지 그대로 남아요.
             </p>
-            <DropZone file={form.file} accept=".hwp" hint="hwp · 한 번에 하나" onFiles={receiveFiles} />
+            <DropZone file={form.file} accept=".hwp" hint={`${grade}학년 편제표 hwp · 한 번에 하나`} onFiles={receiveFiles} />
             {form.base && !form.file && <p className="text-xs text-gray-500">새 파일을 고르지 않으면 {form.base.file_name} 파일은 그대로 두고 아래 과목만 정정해요.</p>}
             {notes.map((n, i) => (
               <p key={i} className="rounded-md bg-amber-50 p-2 text-xs text-amber-900">
