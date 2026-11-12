@@ -341,3 +341,27 @@ test("산출 안내 서식의 그림: 원본 크기 비율이 표시 크기 비�
     }
   }
 });
+
+test("가정통신문·회의 자료 표: 과목명 칸은 모두 가운데 정렬이다", async () => {
+  const date = { year: 2027, month: 4, day: 20 };
+  const check = async (bytes: Uint8Array, label: string) => {
+    const pkg = await openPackage(bytes);
+    const header = parseXml((await pkg.zip.file("Contents/header.xml")!.async("string")));
+    const alignOf = (id: string) => first(descendants(header.documentElement, "paraPr").find((e) => e.getAttribute("id") === id)!, "align")!.getAttribute("horizontal");
+    let names = 0;
+    for (const tc of descendants(pkg.section, "tc")) {
+      const text = descendants(tc, "p").map((p) => paragraphText(p)).join("");
+      if (!/^예시교과/.test(text.trim())) continue;
+      names++;
+      for (const p of descendants(tc, "p")) assert.equal(alignOf(p.getAttribute("paraPrIDRef")!), "CENTER", `${label}: 과목명 '${text.trim()}'이 가운데 정렬이 아니에요`);
+    }
+    assert.ok(names >= 8, `${label}: 과목명 칸을 찾지 못했어요(${names})`);
+  };
+  for (const kind of ["first", "term", "perf"] as const) {
+    const tplName = kind === "perf" ? "notice-perf" : kind === "term" ? "notice-term" : "notice-written";
+    await check(await docs.buildNotice(tpl(tplName), { year: 2027, semester: 1, kind, grades: gradesFor(kind), date }), `가정통신문 ${kind}`);
+  }
+  for (const kind of ["first", "term"] as const) {
+    await check(await docs.buildMeeting(tpl(kind === "term" ? "notice-term" : "notice-written"), { year: 2027, semester: 1, kind, grades: gradesFor(kind), date }), `회의 자료 ${kind}`);
+  }
+});
