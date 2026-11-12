@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fixedGroupText, fixedRowValues, namesIn } from "./fixed.ts";
+import { fixedGroupText, fixedRowValues, namesIn, omitsSubject } from "./fixed.ts";
 import type { Course } from "./curriculum.ts";
 import type { SubjectPlan } from "./pdf.ts";
 
@@ -14,13 +14,19 @@ test("고정분할 값: 5단계 90·80·70·60, 3단계 80·60·0··, 1학년�
   assert.deepEqual(fixedRowValues("first", 1, "3"), ["80", "60", "0", "·", "·"]);
 });
 
-test("2차·학기말은 2차 정기시험 값 뒤에 학기말 값이 오고, 시험을 보지 않으면 정기시험 칸이 -이다", () => {
+test("2차·학기말은 2차 정기시험 값 뒤에 학기말 값이 오고, 2차 정기시험만 없으면 그 칸이 -이다", () => {
   assert.deepEqual(fixedRowValues("term", 3, "3"), ["80", "60", "0", "·", "80", "60", "0", "·"]);
-  assert.deepEqual(fixedRowValues("term", 3, "3", plan("3", "a", "", "")), ["-", "-", "-", "-", "80", "60", "0", "·"]);
+  assert.deepEqual(fixedRowValues("term", 3, "3", plan("3", "a", "20%", "")), ["-", "-", "-", "-", "80", "60", "0", "·"]);
   assert.deepEqual(fixedRowValues("term", 1, "5", plan("1", "a", "20%", "20%")), ["90", "80", "70", "60", "40", "90", "80", "70", "60", "40"]);
-  // 1차 문서는 1차 반영 비율을, 2차 문서는 2차 반영 비율을 본다.
-  assert.deepEqual(fixedRowValues("first", 2, "5", plan("2", "a", "", "30%")), ["-", "-", "-", "-"]);
-  assert.deepEqual(fixedRowValues("term", 2, "5", plan("2", "a", "", "30%")).slice(0, 4), ["90", "80", "70", "60"]);
+});
+
+test("협의록에 정기시험이 없는 과목은 뺀다(1차 공지는 1차가 없으면, 2차·학기말 공지는 정기시험이 모두 없으면)", () => {
+  assert.equal(omitsSubject("first", undefined), false);
+  assert.equal(omitsSubject("first", plan("2", "a", "", "30%")), true);
+  assert.equal(omitsSubject("first", plan("2", "a", "30%", "")), false);
+  assert.equal(omitsSubject("term", plan("2", "a", "", "30%")), false);
+  assert.equal(omitsSubject("term", plan("2", "a", "30%", "")), false);
+  assert.equal(omitsSubject("term", plan("2", "a", "", "")), true);
 });
 
 test("편제표 과목 중 추정 과목은 빼고 나머지를 고정분할로 채운다(P 과목 제외)", () => {
@@ -32,12 +38,15 @@ test("편제표 과목 중 추정 과목은 빼고 나머지를 고정분할로 
   assert.equal(r.assumed, 1); // 음악: 협의록이 없어 정기시험을 본다고 가정
 });
 
-test("협의록에 시험이 없다고 적힌 3단계 과목은 '-'이고, 띄어쓰기가 달라도 같은 과목이다", () => {
-  const courses = [course("스포츠 생활1", "3"), course("영어 독해와 작문", "5")];
+test("협의록에 정기시험이 없는 과목은 목록에서 빠지고 이름이 돌아온다(띄어쓰기가 달라도 같은 과목)", () => {
+  const courses = [course("스포츠 생활1", "3"), course("영어 독해와 작문", "5"), course("음악", "3")];
   const plans = new Map([["2|스포츠생활1", plan("2", "스포츠생활1", "", "")]]);
-  const r = fixedGroupText("term", 2, courses, "추정\n영어독해와작문\t1\t2\t3\t4\t5\t6\t7\t8", plans);
-  assert.equal(r.text, "고정\n스포츠 생활1\t-\t-\t-\t-\t80\t60\t0\t·");
-  assert.equal(r.assumed, 0);
+  const first = fixedGroupText("first", 2, courses, "추정\n영어독해와작문\t1\t2\t3\t4", plans);
+  assert.equal(first.text, "고정\n음악\t80\t60\t0\t·");
+  assert.deepEqual(first.omitted, ["스포츠 생활1"]);
+  assert.equal(first.assumed, 1); // 음악: 협의록이 없어 정기시험을 본다고 가정
+  const term = fixedGroupText("term", 2, courses, "추정\n영어독해와작문\t1\t2\t3\t4\t5\t6\t7\t8", plans);
+  assert.deepEqual(term.omitted, ["스포츠 생활1"]);
 });
 
 test("추정 자료가 없는 학년은 모든 과목이 고정분할이고, 이미 '고정' 줄이 있으면 머리 줄 없이 이어 붙인다", () => {

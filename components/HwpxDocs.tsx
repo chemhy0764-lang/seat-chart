@@ -502,6 +502,7 @@ export function NoticeSection({ term, admin = false }: { term: Term; admin?: boo
       }
       let fixedTotal = 0;
       let assumedTotal = 0;
+      const omitted: string[] = [];
       let noCurriculum = false;
       for (const g of [1, 2, 3] as const) {
         const plan = await latestPlan("cutoffs", String(g), year, semester);
@@ -517,6 +518,7 @@ export function NoticeSection({ term, admin = false }: { term: Term; admin?: boo
             noCurriculum = true;
           } else {
             const fixed = fixedGroupText(kind, g, courses, text, plans);
+            omitted.push(...fixed.omitted.map((n) => `${g}학년 ${n}`));
             if (fixed.text !== "") {
               text = (text !== "" ? text.trimEnd() + "\n" : "") + fixed.text;
               fixedTotal += fixed.count;
@@ -534,7 +536,8 @@ export function NoticeSection({ term, admin = false }: { term: Term; admin?: boo
       }
       if (withFixed && fixedTotal > 0) found.push(`편제표로 고정분할 ${fixedTotal}과목`);
       if (noCurriculum) found.push("편제표가 없는 학년은 고정분할 과목을 채우지 못함(자료 첨부 탭에서 관리자가 올리면 채워져요)");
-      if (assumedTotal > 0) found.push(`정기시험을 보지 않는 과목은 값을 -로 고쳐 주세요(협의록에서 확인하지 못한 3단계 과목 ${assumedTotal}개는 정기시험을 본다고 가정했어요)`);
+      if (omitted.length > 0) found.push(`협의록에 정기시험이 없어 뺀 과목: ${omitted.join(", ")}`);
+      if (assumedTotal > 0) found.push(`협의록에서 확인하지 못한 3단계 과목 ${assumedTotal}개는 정기시험이 있는 것으로 보고 점수를 넣었어요. 정기시험이 없는 과목은 목록에서 지워 주세요`);
       setTexts({ ...texts, [kind]: next });
       setPlanNote({
         ok: found.length > 0,
