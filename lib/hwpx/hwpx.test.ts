@@ -322,3 +322,22 @@ test("산출 안내: 오타와 옛 용어(지필평가 등)가 바로잡혀 있�
   const s = second.join("\n");
   assert.ok(s.includes("교과담임이 여러 명일 경우, 모두 입력") && !s.includes("교과담당교사"));
 });
+
+test("산출 안내 서식의 그림: 원본 크기 비율이 표시 크기 비율과 같고 그림이 모두 들어 있다", async () => {
+  for (const name of ["guide-1st", "guide-2nd"]) {
+    const pkg = await openPackage(tpl(name));
+    const pics = descendants(pkg.section, "pic");
+    assert.equal(pics.length, 5, `${name}: 그림 5개`);
+    for (const pic of pics) {
+      const cur = first(pic, "curSz")!;
+      const org = first(pic, "orgSz")!;
+      const clip = first(pic, "imgClip")!;
+      const ratio = (w: string | null, h: string | null) => Number(w) / Number(h);
+      const a = ratio(cur.getAttribute("width"), cur.getAttribute("height"));
+      const b = ratio(org.getAttribute("width"), org.getAttribute("height"));
+      // 그림 1은 옛 원본이라 약간 달라도 되므로 15% 안쪽으로 본다
+      assert.ok(Math.abs(a - b) / a < 0.15, `${name}: 그림 비율이 많이 달라요 ${a} vs ${b}`);
+      assert.equal(clip.getAttribute("right"), org.getAttribute("width"), `${name}: 자르기 영역이 원본과 같아야 해요`);
+    }
+  }
+});
