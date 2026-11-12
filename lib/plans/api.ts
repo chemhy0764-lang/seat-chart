@@ -108,8 +108,14 @@ export async function savePlan(input: SaveInput): Promise<PlanRow> {
   let file_type: FileType;
 
   if (input.file) {
-    const type = input.kind === "curriculum" ? (/\.hwp$/i.test(input.file.name) ? "hwp" : null) : fileTypeOf(input.file.name);
-    if (!type) throw new Error(input.kind === "curriculum" ? "편제표는 hwp 파일만 올릴 수 있어요." : "hwpx, xlsx, pdf 파일만 올릴 수 있어요.");
+    // 편제표는 hwp만, 추정분할점수는 hwp 제외(NEIS 엑셀·PDF), 협의록은 hwp·hwpx·xlsx·pdf를 받는다.
+    const found = fileTypeOf(input.file.name);
+    const type = input.kind === "curriculum" ? (found === "hwp" ? found : null) : input.kind === "cutoffs" ? (found === "hwp" ? null : found) : found;
+    if (!type) {
+      throw new Error(
+        input.kind === "curriculum" ? "편제표는 hwp 파일만 올릴 수 있어요." : input.kind === "cutoffs" ? "hwpx, xlsx, pdf 파일만 올릴 수 있어요." : "hwp, hwpx, xlsx, pdf 파일만 올릴 수 있어요.",
+      );
+    }
     file_path = `${input.kind}/${crypto.randomUUID()}.${type}`;
     file_name = input.file.name;
     file_type = type;

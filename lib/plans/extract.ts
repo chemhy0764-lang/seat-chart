@@ -4,11 +4,12 @@
 import JSZip from "jszip";
 import { children, descendants, first, parseXml } from "../hwpx/dom.ts";
 import { paragraphText } from "../hwpx/text.ts";
+import { readHwpTexts } from "./hwp.ts";
 import { looksLikeNeis, neisTexts, parseNeisRows, type NeisTexts } from "./neis.ts";
 import { looksLikeNeisPdf, parseNeisPdf } from "./neis-pdf.ts";
-import { minutesFromPdf, readPdfPages, subjectsFromRows, type PdfJs, type SubjectPlan } from "./pdf.ts";
+import { minutesFromPdf, normalizeNames, readPdfPages, subjectsFromRows, type PdfJs, type SubjectPlan } from "./pdf.ts";
 
-/** hwp(이진 한글 파일)는 편제표에서만 쓴다. */
+/** hwp(이진 한글 파일)는 편제표와 협의록에서 쓴다. */
 export type FileType = "hwpx" | "pdf" | "xlsx" | "hwp";
 export type MinutesData = {
   place: string;
@@ -19,9 +20,40 @@ export type MinutesData = {
 };
 
 export const fileTypeOf = (name: string): FileType | null => {
-  const m = /\.(hwpx|pdf|xlsx)$/i.exec(name.trim());
+  const m = /\.(hwpx|hwp|pdf|xlsx)$/i.exec(name.trim());
   return m ? (m[1].toLowerCase() as FileType) : null;
 };
+
+// ───────── hwp(이진 한글) ─────────
+
+const squashed = (s: string) => s.replace(/\s+/g, "");
+const MINUTES_LABELS = new Set(["일시", "장소", "참석자", "기록자", "협의주제", "협의", "사항", "협의사항"]);
+
+/** 라벨 칸('장소' 등) 바로 다음 칸의 글자. 다음 칸이 또 다른 라벨이면(비어 있는 서식) 빈 글자. */
+function valueAfter(texts: string[], label: string): string {
+  const i = texts.findIndex((t) => squashed(t) === label);
+  const v = i < 0 ? undefined : texts[i + 1];
+  return v === undefined || MINUTES_LABELS.has(squashed(v)) ? "" : v.trim();
+}
+
+/**
+ * hwp 교과협의록의 칸 글자들(읽는 순서)에서 교과, 학년도·학기, 장소·참석자·기록자를 읽는다.
+ * 과목별 반영 비율 표는 병합된 칸이 많아 hwp에서는 읽지 않는다(필요하면 pdf나 hwpx로 올리거나 화면에서 입력).
+ */
+export function minutesFromHwpTexts(texts: string[]): { area: string; year: number | null; semester: number | null; place: string; attendees: string; recorder: string } {
+  const title = texts.find((t) => /회의록|협의록/.test(t)) ?? "";
+  const rawArea = (/\(\s*([^)]*?)\s*\)\s*과/.exec(title) ?? /^\s*(\S+?)\s*과\s*교과협의록/.exec(title))?.[1] ?? "";
+  const topic = valueAfter(texts, "협의주제");
+  const term = /(\d{4})\s*학년도\s*(\d)\s*학기/.exec(topic);
+  return {
+    area: /^0+$/.test(rawArea) ? "" : rawArea,
+    year: term ? Number(term[1]) : null,
+    semester: term ? Number(term[2]) : null,
+    place: /^0{2,}/.test(valueAfter(texts, "장소")) ? "" : valueAfter(texts, "장소"), // 빈 서식의 '00실'은 값이 아니다
+    attendees: normalizeNames(valueAfter(texts, "참석자")),
+    recorder: valueAfter(texts, "기록자"),
+  };
+}
 
 /** 표 한 줄: 칸마다 글자와 세로 병합 칸 수 */
 export type Cell = { text: string; rowSpan: number };
@@ -188,10 +220,19 @@ export async function extractFromFile(
   options: { pdfjs?: PdfJs } = {},
 ): Promise<Extracted> {
   const fileType = fileTypeOf(name);
-  if (!fileType) throw new Error("hwpx, xlsx, pdf 파일만 올릴 수 있어요.");
+  if (!fileType) throw new Error("hwp, hwpx, xlsx, pdf 파일만 올릴 수 있어요.");
   const result: Extracted = { fileType, minutes: null, cutoffText: null, cutoffTexts: null, area: "", grade: null, year: null, semester: null, warnings: [] };
   try {
-    if (fileType === "hwpx") {
+    if (fileType === "hwp") {
+      const m = minutesFromHwpTexts(await readHwpTexts(bytes));
+      result.area = m.area;
+      result.year = m.year;
+      result.semester = m.semester;
+      result.minutes = { place: m.place, attendees: m.attendees, recorder: m.recorder };
+      if (!m.place && !m.attendees && !m.recorder) {
+        result.warnings.push("이 hwp에서 장소, 참석자, 기록자를 찾지 못했어요. 교과협의록 파일이 맞는지 확인하거나 아래에 직접 입력하세요.");
+      }
+    } else if (fileType === "hwpx") {
       const tables = await readHwpxTables(bytes);
       const rows = tables.flatMap((t) => t.map((r) => r.map((c) => c.text)));
       result.minutes = { ...minutesFromRows(rows), subjects: subjectsFromRows(rows) };

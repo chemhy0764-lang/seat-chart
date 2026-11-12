@@ -1,9 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import * as CFB from "cfb";
-import { deflateRawSync } from "node:zlib";
 import { areasOfGroup, courseNames, coursesToText, findCourse, levelsOfType, parseCoursesText, parseCurriculum } from "./curriculum.ts";
 import { readHwpTexts } from "./hwp.ts";
+import { fakeHwp } from "./fixtures/fakeHwp.ts";
 
 const TITLE = "학교교육과정 편제 및 시간배당 관리 보고서";
 const HEAD = ["순번", "편제명", "시수", "학점", "과목명", "시수", "학점", "성적처리유형", "비고"];
@@ -81,26 +80,6 @@ test("교과·학년으로 과목 이름을 찾고, 표기가 달라도 같은 �
   assert.equal(findCourse(byGrade, "2", "국어", "언어생활탐구")?.levels, "5");
   assert.equal(findCourse(byGrade, "1", "국어", "언어생활탐구"), undefined);
 });
-
-/** 시험용 hwp: 구역 하나에 문단 글자 기록만 넣은 CFB. */
-function fakeHwp(texts: string[], compressed: boolean): Uint8Array {
-  const records = texts.map((t) => {
-    const body = Buffer.alloc(t.length * 2 + 2);
-    for (let i = 0; i < t.length; i++) body.writeUInt16LE(t.charCodeAt(i), i * 2);
-    body.writeUInt16LE(13, t.length * 2);
-    const head = Buffer.alloc(4);
-    head.writeUInt32LE(0x43 | (3 << 10) | (body.length << 20), 0);
-    return Buffer.concat([head, body]);
-  });
-  const section = Buffer.concat(records);
-  const header = Buffer.alloc(256);
-  header.write("HWP Document File", 0, "latin1");
-  header.writeUInt32LE(compressed ? 1 : 0, 36);
-  const cfb = CFB.utils.cfb_new();
-  CFB.utils.cfb_add(cfb, "/FileHeader", header);
-  CFB.utils.cfb_add(cfb, "/BodyText/Section0", compressed ? deflateRawSync(section) : section);
-  return new Uint8Array(CFB.write(cfb, { type: "buffer" }) as Buffer);
-}
 
 test("hwp 파일에서 문단 글자를 읽는다(압축 여부와 상관없이)", async () => {
   const texts = ["제목", "일반계  1학년 2학기", "공통국어2"];

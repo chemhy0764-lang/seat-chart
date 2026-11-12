@@ -16,7 +16,8 @@ test("파일 이름으로 형식을 알아낸다", () => {
   assert.equal(fileTypeOf("협의록.HWPX"), "hwpx");
   assert.equal(fileTypeOf("a.xlsx"), "xlsx");
   assert.equal(fileTypeOf("a.pdf"), "pdf");
-  assert.equal(fileTypeOf("a.hwp"), null);
+  assert.equal(fileTypeOf("a.hwp"), "hwp");
+  assert.equal(fileTypeOf("a.doc"), null);
   assert.equal(fileTypeOf("a.exe"), null);
 });
 
@@ -135,4 +136,28 @@ test("글자를 읽을 수 없는 PDF·파일은 안내를 돌려주고, 지원�
   const bad = await extractFromFile("a.xlsx", new Uint8Array([1, 2, 3]));
   assert.ok(bad.warnings.length > 0);
   await assert.rejects(() => extractFromFile("a.exe", new Uint8Array()), /hwpx, xlsx, pdf/);
+});
+
+test("협의록 hwp(한글 이진 파일)에서 교과·학기·장소·참석자·기록자를 읽는다", async () => {
+  const { fakeHwp } = await import("./fixtures/fakeHwp.ts");
+  const texts = [
+    "( 과학 )과 회의록", "일시", "2025년 9월 11일 목요일 15시 30분", "장소", "가상실", "참석자", "가나다, 라마바 사아자", "기록자", "라마바",
+    "협의주제", "2025학년도 2학기 1차 지필평가 원안지 검토 및 분할점수 산출", "협   의", "사   항",
+  ];
+  const r = await extractFromFile("협의록.hwp", fakeHwp(texts, true));
+  assert.equal(r.fileType, "hwp");
+  assert.equal(r.area, "과학");
+  assert.equal(r.year, 2025);
+  assert.equal(r.semester, 2);
+  assert.deepEqual(r.minutes, { place: "가상실", attendees: "가나다, 라마바, 사아자", recorder: "라마바" });
+  assert.deepEqual(r.warnings, []);
+});
+
+test("협의록 hwp: 빈 서식은 값을 비우고 안내하며, 교과가 00이면 비운다", async () => {
+  const { fakeHwp } = await import("./fixtures/fakeHwp.ts");
+  const blank = ["( 00 )과 회의록", "일시", "", "장소", "참석자", "기록자", "협   의", "사   항"];
+  const r = await extractFromFile("빈서식.hwp", fakeHwp(blank, false));
+  assert.equal(r.area, "");
+  assert.deepEqual(r.minutes, { place: "", attendees: "", recorder: "" });
+  assert.equal(r.warnings.length, 1);
 });
