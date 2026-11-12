@@ -37,10 +37,15 @@ test("5% 미만(E가 0 포함)은 오류", () => {
   assert.ok(r.some((i) => /5% 이상/.test(i.message)));
 });
 
-test("빈 칸은 오류이고 큰 순서가 아니면 경고", () => {
+test("빈 칸은 오류이고, 하위 수준이 상위 수준보다 높으면 오류(같은 값은 허용)", () => {
   assert.equal(errors(checkRates({ A: 85, B: 75 })).length, 3);
-  const w = checkRates({ A: 70, B: 75, C: 60, D: 45, E: 30 }).filter((i) => i.severity === "warn");
-  assert.equal(w.length, 1);
+  const r = errors(checkRates({ A: 70, B: 75, C: 60, D: 45, E: 30 }));
+  assert.equal(r.length, 1);
+  assert.match(r[0].message, /B\(75\)가 A\(70\)보다 높아요/);
+  // 같은 값은 NEIS가 허용한다(높을 수 없다는 규칙뿐)
+  assert.deepEqual(checkRates({ A: 85, B: 85, C: 70, D: 55, E: 40 }), []);
+  // 하위가 상위보다 높아도 인접 차이 규칙이 겹쳐 오류를 늘리지 않는다
+  assert.equal(checkRates({ A: 60, B: 85, C: 70, D: 55, E: 40 }).filter((i) => i.message.includes("높아요")).length, 1);
 });
 
 test("공동출제 교사 사이 차이가 15%를 넘으면 오류", () => {

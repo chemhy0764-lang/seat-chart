@@ -42,10 +42,11 @@ export function checkRates(rates: Rates): Issue[] {
     const u = values[upper];
     const l = values[lower];
     if (u === undefined || l === undefined) continue;
-    if (u <= l) {
+    // NEIS 입력 화면 안내: "최소능력자 예상정답률은 상위수준의 예상정답률보다 높을 수 없습니다." 같은 값(A 85, B 85)은 허용된다.
+    if (l > u) {
       issues.push({
-        severity: "warn",
-        message: `${upper}(${u})가 ${lower}(${l})보다 크지 않아요. 안내문에 명시된 규칙은 아니지만 확인하세요.`,
+        severity: "error",
+        message: `${lower}(${l})가 ${upper}(${u})보다 높아요. 하위 수준의 예상정답률은 상위 수준보다 높을 수 없어요.`,
       });
     }
     const limit = lower === "E" ? 19 : 15;
