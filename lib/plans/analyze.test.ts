@@ -17,6 +17,7 @@ test("hwp 편제표는 학년과 과목으로 알아낸다", async () => {
   assert.ok(a.ok);
   assert.equal(a.kind, "curriculum");
   assert.equal(a.scope, "2");
+  assert.equal(a.year, 2026); // 출력한 날짜(2026.01.01.)에서
   assert.equal(a.semester, 2);
   assert.deepEqual((a.parsed.courses as { subject: string }[]).map((c) => c.subject), ["공통국어2"]);
 });

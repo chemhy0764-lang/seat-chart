@@ -59,6 +59,21 @@ export async function listPlans(kind: PlanKind, year: number, semester: number):
   return (data ?? []) as PlanRow[];
 }
 
+/** 종류별로 모든 학년도·학기의 자료를 모든 판까지 가져온다(학년도·학기 순, 최신 판이 앞). */
+export async function listAllPlans(kind: PlanKind): Promise<PlanRow[]> {
+  const { data, error } = await createClient()
+    .from("plan_uploads")
+    .select(COLUMNS)
+    .eq("kind", kind)
+    .order("year", { ascending: false })
+    .order("semester", { ascending: false })
+    .order("scope", { ascending: true })
+    .order("exam", { ascending: true })
+    .order("version", { ascending: false });
+  if (error) throw explain(error, "read");
+  return (data ?? []) as PlanRow[];
+}
+
 /**
  * 자료의 최신 판. fallback이 true면 같은 학기에 없을 때 같은 교과·학년·시험 구분의 가장 최근 학기 자료를 쓴다
  * (협의록의 장소·참석자처럼 학기가 바뀌어도 참고할 만한 값에만 쓰고, 분할점수에는 쓰지 않는다).
