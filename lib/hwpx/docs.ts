@@ -293,17 +293,23 @@ export async function buildNotice(data: ArrayBuffer | Uint8Array, o: NoticeOptio
 }
 
 /** 학업성적관리회의 자료: 가정통신문 표를 그대로 쓰되 머리글·인사말·참고·직인을 뺀다. */
-export async function buildMeeting(data: ArrayBuffer | Uint8Array, o: Omit<NoticeOptions, "kind"> & { kind: "first" | "term" }): Promise<Uint8Array> {
+export async function buildMeeting(data: ArrayBuffer | Uint8Array, o: Omit<NoticeOptions, "kind"> & { kind: NoticeKind }): Promise<Uint8Array> {
   const pkg = await openPackage(data);
   const doc = pkg.section;
   const root = doc.documentElement;
+  const perf = o.kind === "perf";
+  // 수행평가는 3학년 표가 없는 서식이라, 3학년 자료가 있으면 2학년 표를 본떠 표를 더한다(가정통신문과 같다).
+  const grade2Template = perf ? (tablesOf(doc)[3].cloneNode(true) as Element) : null;
   const made = fillTables(pkg, o);
+  if (grade2Template) addPerfGrade3(pkg, o, grade2Template);
   replaceAll(doc, noticeTextPairs(o));
 
   const paras = children(root, "p");
   const index = (el: Element) => paras.indexOf(paragraphOf(el));
   const firstTable = index(made[0]);
-  const lastTable = index(made[made.length - 1]);
+  // 학년별 표 중 마지막(수행평가는 3학년 표가 더해졌을 수 있다). 날짜·직인 표는 칸 수가 적어 제외한다.
+  const gradeTables = tablesOf(doc).filter((t) => Number(t.getAttribute("colCnt")) > 5);
+  const lastTable = perf ? index(gradeTables[gradeTables.length - 1]) : index(made[made.length - 1]);
   const heading = firstTable - 2;
 
   // 첫 문단: 쪽 설정(secPr)이 든 run은 두고, 머리글 표와 그림이 든 run만 지운다.
@@ -311,10 +317,11 @@ export async function buildMeeting(data: ArrayBuffer | Uint8Array, o: Omit<Notic
     if (descendants(run, "tbl").length > 0 || descendants(run, "pic").length > 0) paras[0].removeChild(run);
   }
   removeAll(paras.slice(1, heading));
-  removeAll(paras.slice(lastTable + 1));
+  // 표 뒤의 문단(안내 글, 날짜, 직인)을 지운다. 수행평가의 '3학년은 전 과목 고정분할' 안내 문구는 회의 자료에도 필요해서 남긴다.
+  removeAll(paras.slice(lastTable + 1).filter((p) => !(perf && paragraphText(p).includes("3학년은 전 과목 고정분할"))));
 
   const title = paras[heading].cloneNode(true) as Element;
-  const examText = o.kind === "first" ? "1차 정기시험" : "2차 정기시험 및 학기말";
+  const examText = o.kind === "first" ? "1차 정기시험" : o.kind === "term" ? "2차 정기시험 및 학기말" : "수행평가";
   setParagraphText(title, `${o.year}학년도 ${o.semester}학기 ${examText} 과목별 분할점수`);
   root.insertBefore(title, paras[heading]);
   return savePackage(pkg);
