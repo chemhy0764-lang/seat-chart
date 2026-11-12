@@ -316,7 +316,7 @@ export function GuideSection({ term }: { term: Term }) {
           교과를 고르면 올린 협의록에서 장소·참석자·기록자·과목이 자동으로 채워져요.
           {hasCurr
             ? ` 과목명 선택지와 성취도 단계는 편제표(${Object.keys(curr).sort().join("·")}학년)대로 채워요.`
-            : " '편제표' 탭에 학년별 편제표를 올리면 과목명 선택지와 성취도 단계도 자동으로 채워져요."}
+            : " '자료 첨부' 탭에 학년별 편제표를 올리면 과목명 선택지와 성취도 단계도 자동으로 채워져요."}
         </p>
         {planNote && (
           <p className={`rounded-md p-2 text-sm ${planNote.ok ? "bg-emerald-50 text-emerald-900" : "bg-amber-50 text-amber-900"}`}>{planNote.text}</p>
@@ -533,7 +533,7 @@ export function NoticeSection({ term, admin = false }: { term: Term; admin?: boo
         }
       }
       if (withFixed && fixedTotal > 0) found.push(`편제표로 고정분할 ${fixedTotal}과목`);
-      if (noCurriculum) found.push("편제표가 없는 학년은 고정분할 과목을 채우지 못함(편제표 탭에서 관리자가 올리면 채워져요)");
+      if (noCurriculum) found.push("편제표가 없는 학년은 고정분할 과목을 채우지 못함(자료 첨부 탭에서 관리자가 올리면 채워져요)");
       if (assumedTotal > 0) found.push(`정기시험을 보지 않는 과목은 값을 -로 고쳐 주세요(협의록에서 확인하지 못한 3단계 과목 ${assumedTotal}개는 정기시험을 본다고 가정했어요)`);
       setTexts({ ...texts, [kind]: next });
       setPlanNote({

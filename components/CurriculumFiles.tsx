@@ -33,7 +33,7 @@ type Form = { scope: string; file: File | null; text: string; note: string; base
 const blank = (): Form => ({ scope: "1", file: null, text: "", note: "", base: null });
 
 /** 학년별 편제표(NEIS '학교교육과정 편제 및 시간배당 관리 보고서', hwp)를 올리는 탭. 관리자만 올리고, 정정은 새 판으로 남긴다. */
-export default function CurriculumFiles({ term }: { term: Term }) {
+export default function CurriculumFiles({ term, embedded = false }: { term: Term; embedded?: boolean }) {
   const { year, semester } = term;
   const [admin, setAdmin] = useState<boolean | null>(null);
   const [rows, setRows] = useState<PlanRow[]>([]);
@@ -166,9 +166,11 @@ export default function CurriculumFiles({ term }: { term: Term }) {
           NEIS의 &apos;학교교육과정 편제 및 시간배당 관리 보고서&apos;(hwp)를 학년마다 올리면, 교과협의록의 과목명 선택지와 성취도 단계(5단계·3단계)가 편제표대로
           자동으로 채워져요. 올린 자료는 지워지지 않고, 정정하면 새 판이 추가돼요.
         </p>
-        <p className={`rounded-md p-2 text-sm ${admin ? "bg-emerald-50 text-emerald-900" : "bg-gray-50 text-gray-700"}`}>
-          {admin === null ? "확인하는 중…" : admin ? "관리자로 로그인했어요. 편제표를 올리고 정정할 수 있어요." : "편제표는 관리자만 올릴 수 있어요. 올라온 자료는 볼 수 있고 내려받을 수 있어요."}
-        </p>
+        {!embedded && (
+          <p className={`rounded-md p-2 text-sm ${admin ? "bg-emerald-50 text-emerald-900" : "bg-gray-50 text-gray-700"}`}>
+            {admin === null ? "확인하는 중…" : admin ? "관리자로 로그인했어요. 편제표를 올리고 정정할 수 있어요." : "편제표는 관리자만 올릴 수 있어요. 올라온 자료는 볼 수 있고 내려받을 수 있어요."}
+          </p>
+        )}
         {loadError && <p className="rounded-md bg-red-50 p-2 text-sm text-red-800">{loadError}</p>}
 
         {groups.length === 0 ? (

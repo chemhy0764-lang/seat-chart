@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { GuideSection, NoticeSection } from "@/components/HwpxDocs";
-import CurriculumFiles from "@/components/CurriculumFiles";
 import PlanFiles from "@/components/PlanFiles";
 import { fetchIsAdmin } from "@/lib/plans/api";
 import { YEARS, type Semester } from "@/lib/hwpx/docs";
@@ -21,7 +20,7 @@ import {
   type Rates,
 } from "@/lib/cutoff";
 
-type Section = "guide" | "notice" | "plans" | "curriculum" | "check";
+type Section = "guide" | "notice" | "plans" | "check";
 type Tab = "paper" | "perf" | "term";
 
 const num = (s: string): number | null => (s.trim() === "" || Number.isNaN(Number(s)) ? null : Number(s));
@@ -50,7 +49,6 @@ export default function CutoffTool() {
     ...(admin === true
       ? ([
           ["check", "점검 도구"],
-          ["curriculum", "편제표"],
           ["plans", "자료 첨부"],
         ] as [Section, string][])
       : []),
@@ -88,7 +86,7 @@ export default function CutoffTool() {
           </button>
         ))}
       </nav>
-      {section !== "check" && (
+      {section !== "check" && section !== "plans" && (
         <div className="flex flex-wrap items-center gap-3 rounded-xl bg-white p-3 text-sm shadow-sm ring-1 ring-black/5">
           <label className="flex items-center gap-2 font-semibold">
             학년도
@@ -115,7 +113,6 @@ export default function CutoffTool() {
       )}
       {section === "guide" && <GuideSection term={{ year, semester }} />}
       {section === "notice" && <NoticeSection term={{ year, semester }} admin={admin === true} />}
-      {admin === true && section === "curriculum" && <CurriculumFiles term={{ year, semester }} />}
       {admin === true && section === "plans" && <PlanFiles term={{ year, semester }} />}
       {admin === true && section === "check" && <CheckTool />}
     </div>
