@@ -175,11 +175,11 @@ function PlanSection({
   const set = (patch: Partial<Form>) => setForm((f) => ({ ...f, ...patch }));
 
   // 시험별 표를 학년의 값 개수에 맞춰 검사한다(비어 있는 표는 건너뛴다).
-  const parsedTexts = isMinutes
-    ? null
-    : Object.fromEntries(
-        EXAM_KINDS.map((k) => [k, form.texts[k].trim() === "" ? null : parseCutoffText(form.texts[k], k === "perf" ? 1 : 0, valueCountFor(k, Number(form.scope)))]),
-      ) as Record<NoticeKind, ReturnType<typeof parseCutoffText> | null>;
+  const parseTextsFor = (f: Form) =>
+    Object.fromEntries(
+      EXAM_KINDS.map((k) => [k, f.texts[k].trim() === "" ? null : parseCutoffText(f.texts[k], k === "perf" ? 1 : 0, valueCountFor(k, Number(f.scope)))]),
+    ) as Record<NoticeKind, ReturnType<typeof parseCutoffText> | null>;
+  const parsedTexts = isMinutes ? null : parseTextsFor(form);
   const parsedSubjects = isMinutes ? parseSubjectsText(form.subjectsText) : null;
   const hasPrevious = rows.some((r) => r.scope === form.scope && r.exam === form.exam);
   const label = (r: { scope: string; exam: string }) => (isMinutes ? r.scope : `${r.scope}학년`);
@@ -197,6 +197,7 @@ function PlanSection({
     }
     const result = await extractFromFile(file.name, await file.arrayBuffer());
     const found = [...lead, ...result.warnings];
+    let mismatch = false;
     let scope: string | undefined;
     if (isMinutes && result.area) {
       const area = matchArea(result.area);
@@ -208,6 +209,7 @@ function PlanSection({
       }
     }
     if (result.year && result.semester && (result.year !== year || result.semester !== semester)) {
+      mismatch = true;
       found.push(`파일은 ${result.year}학년도 ${result.semester}학기 자료로 보여요. 위에서 고른 ${year}학년도 ${semester}학기와 달라요. 학기를 맞춘 뒤 올려 주세요.`);
     }
     let texts: Record<NoticeKind, string> | undefined;
@@ -244,16 +246,22 @@ function PlanSection({
       found.push("파일에서 장소, 참석자, 기록자를 찾지 못했어요. 아래에 직접 입력해 주세요.");
     }
     setNotes(found);
-    setForm((f) => ({
-      ...f,
+    const next: Form = {
+      ...form,
       file,
-      scope: f.base ? f.scope : (scope ?? f.scope),
-      place: result.minutes?.place || f.place,
-      attendees: result.minutes?.attendees || f.attendees,
-      recorder: result.minutes?.recorder || f.recorder,
-      subjectsText: result.minutes?.subjects?.length ? subjectsToText(result.minutes.subjects) : f.subjectsText,
-      texts: texts ?? f.texts,
-    }));
+      scope: form.base ? form.scope : (scope ?? form.scope),
+      place: result.minutes?.place || form.place,
+      attendees: result.minutes?.attendees || form.attendees,
+      recorder: result.minutes?.recorder || form.recorder,
+      subjectsText: result.minutes?.subjects?.length ? subjectsToText(result.minutes.subjects) : form.subjectsText,
+      texts: texts ?? form.texts,
+    };
+    setForm(next);
+    // 교과·학년을 파일에서 읽었고 학기도 맞고 값이 들어 있고 처음 올리는 자료이면 바로 저장한다. 아니면 확인하고 저장 버튼을 누르게 한다.
+    const hasValues = isMinutes ? !!(result.minutes?.place || result.minutes?.attendees || result.minutes?.recorder) : texts !== undefined;
+    if (!form.base && scope !== undefined && !mismatch && result.warnings.length === 0 && lead.length === 0 && hasValues && problemOf(next) === null) {
+      await save(next);
+    }
   }
 
   /** 끌어다 놓거나 고른 파일들. 한 번에 파일 하나만 쓴다. */
@@ -280,43 +288,46 @@ function PlanSection({
     setMessage(null);
   }
 
-  const problem = (() => {
-    if (!form.scope) return isMinutes ? "교과를 선택하세요." : "학년을 선택하세요.";
-    if (!form.file && !form.base) return "올릴 파일을 선택하세요.";
-    if (parsedTexts) {
+  const problemOf = (f: Form): string | null => {
+    const pTexts = isMinutes ? null : parseTextsFor(f);
+    const pSubjects = isMinutes ? parseSubjectsText(f.subjectsText) : null;
+    if (!f.scope) return isMinutes ? "교과를 선택하세요." : "학년을 선택하세요.";
+    if (!f.file && !f.base) return "올릴 파일을 선택하세요.";
+    if (pTexts) {
       // 표를 읽지 못했더라도 파일을 올렸다면 파일만 보관할 수 있다(값이 없는 자료는 공지 탭 불러오기에서 건너뛴다).
-      if (EXAM_KINDS.every((k) => form.texts[k].trim() === "") && !form.file) return "분할점수 표가 비어 있어요.";
-      if (EXAM_KINDS.some((k) => (parsedTexts[k]?.errors.length ?? 0) > 0)) return "분할점수 표의 오류를 먼저 고쳐 주세요.";
+      if (EXAM_KINDS.every((k) => f.texts[k].trim() === "") && !f.file) return "분할점수 표가 비어 있어요.";
+      if (EXAM_KINDS.some((k) => (pTexts[k]?.errors.length ?? 0) > 0)) return "분할점수 표의 오류를 먼저 고쳐 주세요.";
     }
-    if (parsedSubjects && parsedSubjects.errors.length > 0) return "과목별 반영 비율의 오류를 먼저 고쳐 주세요.";
-    if (hasPrevious && form.note.trim() === "") return "이미 올린 자료가 있어요. 정정 사유를 적어 주세요.";
+    if (pSubjects && pSubjects.errors.length > 0) return "과목별 반영 비율의 오류를 먼저 고쳐 주세요.";
+    if (rows.some((r) => r.scope === f.scope && r.exam === f.exam) && f.note.trim() === "") return "이미 올린 자료가 있어요. 정정 사유를 적어 주세요.";
     return null;
-  })();
+  };
+  const problem = problemOf(form);
 
-  async function save() {
+  async function save(f: Form = form) {
     setBusy(true);
     setMessage(null);
     try {
       const parsed = isMinutes
         ? {
-            place: form.place.trim(),
-            attendees: form.attendees.trim(),
-            recorder: form.recorder.trim(),
-            subjects: parsedSubjects?.subjects ?? [],
+            place: f.place.trim(),
+            attendees: f.attendees.trim(),
+            recorder: f.recorder.trim(),
+            subjects: parseSubjectsText(f.subjectsText).subjects,
           }
-        : { texts: Object.fromEntries(EXAM_KINDS.map((k) => [k, form.texts[k].trim()])) };
+        : { texts: Object.fromEntries(EXAM_KINDS.map((k) => [k, f.texts[k].trim()])) };
       const saved = await savePlan({
         kind,
-        scope: form.scope,
+        scope: f.scope,
         year,
         semester,
-        exam: form.exam,
+        exam: f.exam,
         parsed,
-        note: form.note.trim(),
-        file: form.file ?? undefined,
-        base: form.file ? undefined : (form.base ?? undefined),
+        note: f.note.trim(),
+        file: f.file ?? undefined,
+        base: f.file ? undefined : (f.base ?? undefined),
       });
-      setMessage({ ok: true, text: `${label(saved)} 자료 ${saved.version}판을 저장했어요.` });
+      setMessage({ ok: true, text: `${label(saved)} 자료 ${saved.version}판을 저장했어요. 고치려면 목록에서 '이 판으로 정정'을 누르세요.` });
       setForm(blankForm(kind));
       setNotes([]);
       onSaved();
@@ -423,6 +434,10 @@ function PlanSection({
             hint={isMinutes ? "hwp, hwpx, xlsx, pdf · 한 번에 하나" : "hwpx, xlsx, pdf · 한 번에 하나"}
             onFiles={receiveFiles}
           />
+          <p className="text-xs text-gray-500">
+            파일을 올리면 내용을 읽고, 처음 올리는 자료이고 확인할 것이 없으면 바로 저장해요. 이미 올린 자료가 있거나 확인할 안내가 나오면 내용을 확인하고 저장을 눌러 주세요.
+            저장한 자료는 &apos;이 판으로 정정&apos;으로 고치기 전까지 그대로 남아요.
+          </p>
           {!isMinutes && form.file && EXAM_KINDS.every((k) => form.texts[k].trim() === "") && (
             <p className="rounded-md bg-amber-50 p-2 text-xs text-amber-900">
               파일에서 분할점수 표를 읽지 못했어요. 이대로 저장하면 파일만 보관되고, 공지 탭에서는 불러올 값이 없어요. 아래 칸에 표를 직접 붙여넣을 수도 있어요.
@@ -509,7 +524,7 @@ function PlanSection({
             />
           </label>
           <div className="flex flex-wrap items-center gap-3">
-            <button className={primary} disabled={busy || problem !== null} onClick={save}>
+            <button className={primary} disabled={busy || problem !== null} onClick={() => save()}>
               {form.base || hasPrevious ? "새 판으로 저장" : "저장"}
             </button>
             {problem && <span className="text-xs text-gray-500">{problem}</span>}

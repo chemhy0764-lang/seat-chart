@@ -88,7 +88,12 @@ export default function CurriculumFiles({ term, embedded = false }: { term: Term
       }
       if (cur.grade) found.push(`${cur.grade}학년으로 읽어 선택했어요.`);
       setNotes(found);
-      setForm((f) => ({ ...f, file, scope: f.base ? f.scope : cur.grade ? String(cur.grade) : f.scope, text: cur.courses.length > 0 ? coursesToText(cur.courses) : f.text }));
+      const next: Form = { ...form, file, scope: form.base ? form.scope : cur.grade ? String(cur.grade) : form.scope, text: cur.courses.length > 0 ? coursesToText(cur.courses) : form.text };
+      setForm(next);
+      // 학년·학기를 읽었고 학기가 맞고 과목이 있고 처음 올리는 편제표이면 바로 저장한다. 아니면 확인하고 저장 버튼을 누르게 한다.
+      if (!form.base && cur.courses.length > 0 && cur.grade !== null && (!cur.semester || cur.semester === semester) && !lead && problemOf(next) === null) {
+        await save(next);
+      }
     } catch (e) {
       found.push(e instanceof Error ? e.message : "파일을 읽지 못했어요.");
       setNotes(found);
@@ -106,30 +111,31 @@ export default function CurriculumFiles({ term, embedded = false }: { term: Term
     setMessage(null);
   }
 
-  const problem = (() => {
-    if (!form.file && !form.base) return "올릴 파일을 선택하세요.";
-    if (form.text.trim() === "") return "과목이 비어 있어요.";
-    if (parsedText.errors.length > 0) return "과목 표의 오류를 먼저 고쳐 주세요.";
-    if (hasPrevious && form.note.trim() === "") return "이미 올린 자료가 있어요. 정정 사유를 적어 주세요.";
+  const problemOf = (f: Form): string | null => {
+    if (!f.file && !f.base) return "올릴 파일을 선택하세요.";
+    if (f.text.trim() === "") return "과목이 비어 있어요.";
+    if (parseCoursesText(f.text).errors.length > 0) return "과목 표의 오류를 먼저 고쳐 주세요.";
+    if (rows.some((r) => r.scope === f.scope) && f.note.trim() === "") return "이미 올린 자료가 있어요. 정정 사유를 적어 주세요.";
     return null;
-  })();
+  };
+  const problem = problemOf(form);
 
-  async function save() {
+  async function save(f: Form = form) {
     setBusy(true);
     setMessage(null);
     try {
       const saved = await savePlan({
         kind: "curriculum",
-        scope: form.scope,
+        scope: f.scope,
         year,
         semester,
         exam: "",
-        parsed: { courses: parsedText.courses },
-        note: form.note.trim(),
-        file: form.file ?? undefined,
-        base: form.file ? undefined : (form.base ?? undefined),
+        parsed: { courses: parseCoursesText(f.text).courses },
+        note: f.note.trim(),
+        file: f.file ?? undefined,
+        base: f.file ? undefined : (f.base ?? undefined),
       });
-      setMessage({ ok: true, text: `${saved.scope}학년 편제표 ${saved.version}판을 저장했어요.` });
+      setMessage({ ok: true, text: `${saved.scope}학년 편제표 ${saved.version}판을 저장했어요. 고치려면 목록에서 '이 판으로 정정'을 누르세요.` });
       setForm(blank());
       setNotes([]);
       setReload((n) => n + 1);
@@ -224,6 +230,10 @@ export default function CurriculumFiles({ term, embedded = false }: { term: Term
                 </button>
               )}
             </div>
+            <p className="text-xs text-gray-500">
+              파일을 올리면 내용을 읽고, 처음 올리는 편제표이면 바로 저장해요. 이미 올린 자료가 있으면 정정 사유를 적고 저장을 눌러 주세요. 저장한 자료는 &apos;이 판으로 정정&apos;으로
+              고치기 전까지 그대로 남아요.
+            </p>
             <DropZone file={form.file} accept=".hwp" hint="hwp · 한 번에 하나" onFiles={receiveFiles} />
             {form.base && !form.file && <p className="text-xs text-gray-500">새 파일을 고르지 않으면 {form.base.file_name} 파일은 그대로 두고 아래 과목만 정정해요.</p>}
             {notes.map((n, i) => (
@@ -260,7 +270,7 @@ export default function CurriculumFiles({ term, embedded = false }: { term: Term
               />
             </label>
             <div className="flex flex-wrap items-center gap-3">
-              <button className={primary} disabled={busy || problem !== null} onClick={save}>
+              <button className={primary} disabled={busy || problem !== null} onClick={() => save()}>
                 {form.base || hasPrevious ? "새 판으로 저장" : "저장"}
               </button>
               {problem && <span className="text-xs text-gray-500">{problem}</span>}
