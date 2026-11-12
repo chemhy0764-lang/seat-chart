@@ -32,7 +32,7 @@ export async function analyzeUpload(name: string, bytes: ArrayBuffer | Uint8Arra
       const cur = parseCurriculum(texts);
       if (cur.courses.length > 0) {
         if (cur.grade === null) return { ok: false, reason: "편제표로 보이는데 학년을 읽지 못했어요. 편제표 구역에서 올려 주세요." };
-        return { ok: true, kind: "curriculum", scope: String(cur.grade), year: null, semester: cur.semester, parsed: { courses: cur.courses }, label: `편제표 ${cur.grade}학년` };
+        return { ok: true, kind: "curriculum", scope: String(cur.grade), year: cur.year, semester: cur.semester, parsed: { courses: cur.courses }, label: `편제표 ${cur.grade}학년` };
       }
       const m = minutesFromHwpTexts(texts);
       if (!m.place && !m.attendees && !m.recorder) return { ok: false, reason: "편제표나 교과협의록으로 읽지 못했어요(빈 서식이거나 다른 문서예요)." };

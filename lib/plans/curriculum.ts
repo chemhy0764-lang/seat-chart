@@ -18,6 +18,8 @@ export type Course = {
 };
 
 export type Curriculum = {
+  /** 출력한 날짜('2026.08.24.')에서 읽은 해. 편제표에는 학년도가 따로 없어 출력 연도로 본다 */
+  year: number | null;
   grade: number | null;
   semester: number | null;
   courses: Course[];
@@ -65,7 +67,8 @@ function pages(tokens: string[]): { head: string[]; body: string[] }[] {
 
 export function parseCurriculum(texts: string[]): Curriculum {
   const tokens = texts.map((t) => t.trim()).filter((t) => t !== "");
-  const result: Curriculum = { grade: null, semester: null, courses: [] };
+  const printed = tokens.find((t) => /^\d{4}\.\d{1,2}\.\d{1,2}\.?$/.test(t));
+  const result: Curriculum = { year: printed ? Number(printed.slice(0, 4)) : null, grade: null, semester: null, courses: [] };
   const seen = new Set<string>();
   let areas: string[] = [];
 

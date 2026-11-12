@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { GuideSection, NoticeSection } from "@/components/HwpxDocs";
-import PlanFiles from "@/components/PlanFiles";
+import AttachTab from "@/components/AttachTab";
 import { fetchIsAdmin } from "@/lib/plans/api";
 import { YEARS, type Semester } from "@/lib/hwpx/docs";
 import {
@@ -112,7 +112,7 @@ export default function CutoffTool() {
       </nav>
       {section === "guide" && <GuideSection term={{ year, semester }} />}
       {section === "notice" && <NoticeSection term={{ year, semester }} admin={admin === true} />}
-      {admin === true && section === "plans" && <PlanFiles term={{ year, semester }} />}
+      {admin === true && section === "plans" && <AttachTab term={{ year, semester }} />}
       {admin === true && section === "check" && <CheckTool />}
     </div>
   );
