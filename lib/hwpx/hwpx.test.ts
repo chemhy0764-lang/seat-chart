@@ -365,3 +365,25 @@ test("가정통신문·회의 자료 표: 과목명 칸은 모두 가운데 정�
     await check(await docs.buildMeeting(tpl(kind === "term" ? "notice-term" : "notice-written"), { year: 2027, semester: 1, kind, grades: gradesFor(kind), date }), `회의 자료 ${kind}`);
   }
 });
+
+test("수행평가 학업성적관리회의 자료: 머리글·인사말·직인을 빼고 학년별 표만 남는다(3학년이 없으면 안내 문구를 남긴다)", async () => {
+  const date = { year: 2027, month: 4, day: 20 };
+  const all = gradesFor("perf");
+  for (const withThird of [true, false]) {
+    const bytes = await docs.buildMeeting(tpl("notice-perf"), { year: 2027, semester: 1, kind: "perf", grades: withThird ? all : all.slice(0, 2), date });
+    const doc = await sectionOf(bytes);
+    const text = allText(doc);
+    const label = withThird ? "3학년 있음" : "3학년 없음";
+    assert.ok(!text.includes("가정통신문") && !text.includes("귀댁에") && !text.includes("교육과정운영"), `${label}: 인사말이 남아 있어요`);
+    assert.ok(text.includes("2027학년도 1학기 수행평가 과목별 분할점수"), `${label}: 제목`);
+    assert.ok(text.includes("2027학년도 1학기 1학년 수행평가") && text.includes("2027학년도 1학기 2학년 수행평가"), `${label}: 학년 제목`);
+    assert.ok(!text.includes("2027. 4. 20.") && !text.includes("직인"), `${label}: 날짜·직인이 남아 있어요`);
+    assert.equal(descendants(doc, "secPr").length, 1, `${label}: 쪽 설정이 사라졌어요`);
+    assert.equal(descendants(doc, "pic").length, 0);
+    assert.equal(text.includes("3학년 수행평가"), withThird, `${label}: 3학년 표`);
+    assert.equal(text.includes("3학년은 전 과목 고정분할"), !withThird, `${label}: 3학년 안내 문구`);
+    const grids = tablesOf(doc);
+    assert.equal(grids.length, withThird ? 3 : 2, `${label}: 표 개수`);
+    grids.forEach(assertCovers);
+  }
+});

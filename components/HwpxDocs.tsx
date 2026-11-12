@@ -647,11 +647,10 @@ export function NoticeSection({ term, admin = false }: { term: Term; admin?: boo
           {admin && (
           <button
             className={primary}
-            disabled={!ready || meeting.busy || kind === "perf"}
+            disabled={!ready || meeting.busy}
             onClick={() =>
               meeting.run("학업성적관리회의 자료", async () => {
-                if (kind === "perf") return;
-                const data = await loadTemplate(kind === "term" ? "noticeTerm" : "noticeWritten");
+                const data = await loadTemplate(kind === "perf" ? "noticePerf" : kind === "term" ? "noticeTerm" : "noticeWritten");
                 const bytes = await buildMeeting(data, { ...term, kind, grades: gradeData(), date: noticeDate() });
                 saveFile(bytes, safeName(`${year}학년도 ${semester}학기 학업성적관리회의 자료(${info.label} 분할점수).hwpx`));
               })
@@ -661,7 +660,6 @@ export function NoticeSection({ term, admin = false }: { term: Term; admin?: boo
           </button>
           )}
         </div>
-        {admin && kind === "perf" && <p className="text-xs text-gray-500">수행평가는 회의 자료 서식이 없어서 가정통신문만 만들어요.</p>}
         {!ready && (
           <p className="text-xs text-gray-500">
             1·2학년을 올바르게 붙여넣으면 내려받을 수 있어요(3학년은 비워 둬도 돼요).
