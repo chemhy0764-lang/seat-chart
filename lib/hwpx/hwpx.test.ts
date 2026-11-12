@@ -286,3 +286,39 @@ test("가정통신문 소수 자리: 1차·2차 정기시험은 소수 둘째 �
   for (const v of ["81", "67", "51", "37"]) assert.ok(t2.includes(v), `학기말: ${v}`);
   assert.ok(!t2.includes("81.4") && !t2.includes("51.49") && !t2.includes("66.5"), "학기말에 소수가 남아 있어요");
 });
+
+test("산출 안내: 오타와 옛 용어(지필평가 등)가 바로잡혀 있다", async () => {
+  const term = { year: 2026, semester: 2 as const, aRatioLimit: "23.9" };
+  const textsOf = async (kind: "first" | "second") => {
+    const doc = await sectionOf(await docs.buildGuide(kind, tpl(kind === "first" ? "guide-1st" : "guide-2nd"), term));
+    return descendants(doc, "p").map((p) => paragraphText(p).replace(/\s+/g, " ").trim()).filter(Boolean);
+  };
+  const first = await textsOf("first");
+  const second = await textsOf("second");
+  for (const [name, ps] of [["1차", first], ["2차", second]] as const) {
+    const all = ps.join("\n");
+    assert.ok(!all.includes("지필"), `${name}: 지필이 남아 있어요`);
+    assert.ok(!all.includes("수행선행작업"), `${name}: 수행선행작업`);
+    assert.ok(all.includes("정기시험/수행평가선행작업"), `${name}: 선행작업 메뉴 이름`);
+    assert.ok(all.includes("[정기시험추정분할점수산출관리]") && all.includes("성적 – 정기시험 – 문항정보표관리"), `${name}: 정기시험 메뉴`);
+    assert.ok(all.includes("[추정분할점수산출결과관리][그림2]"), `${name}: 결과관리 버튼 이름`);
+    assert.ok(all.includes("메시지 보내기") && !all.includes("메시지 전송"), `${name}: 메시지 보내기로 통일`);
+    assert.ok(all.includes("결재자 지정") && !all.includes("결재자지정"), `${name}: 결재자 지정으로 통일`);
+    assert.ok(all.includes("공통과목은 5수준(A-E)+미도달(I) 선택, 선택과목은 5수준(A-E) 선택"), `${name}: 평가단계 설명`);
+    assert.ok(all.includes("2026학년도 2학기") && all.includes("23.9%보다 높으면"), `${name}: 학기·A 비율`);
+    // 괄호 짝: '예)'·'1)' 같은 번호 표시를 뺀 뒤 여는 괄호와 닫는 괄호의 수가 같아야 한다
+    for (const t of ps) {
+      const stripped = t.replace(/(^|\s)(예|\d)\)/g, "$1");
+      assert.equal((stripped.match(/\(/g) ?? []).length, (stripped.match(/\)/g) ?? []).length, `${name}: 괄호 짝이 맞지 않아요: ${t.slice(0, 60)}`);
+    }
+  }
+  const f = first.join("\n");
+  assert.ok(f.includes("1학년 공통 과목과") && !f.includes("과목와"));
+  assert.ok(f.includes("D:52×0.5=26") && !f.includes("D:52×0.6=26"), "성취율 D 50%의 계산식");
+  assert.ok(f.includes("학년도/학기/학년/과목") && !f.includes("학기학년"));
+  assert.ok(f.includes("20% 이상인 칸") && f.includes("A 입력 값") && f.includes("산출 시") && f.includes("협의하세요") && f.includes("총점 52점, 성취율을 A:90 B:70 C:50"));
+  assert.ok(f.includes("수행평가 기본점수를 초과해야 함"));
+  assert.ok(!f.includes("입력마감 후, "), "1차: 입력마감 후 → 입력 후");
+  const s = second.join("\n");
+  assert.ok(s.includes("교과담임이 여러 명일 경우, 모두 입력") && !s.includes("교과담당교사"));
+});
