@@ -140,6 +140,13 @@ function makeCell(proto: Element, o: CellOpts): Element {
   return tc;
 }
 
+/** 칸 안의 모든 문단을 like 칸의 첫 문단과 같은 문단 서식(정렬 등)으로 바꾼다. */
+function alignLike(tc: Element, like: Element): void {
+  const id = descendants(like, "p")[0]?.getAttribute("paraPrIDRef");
+  if (id == null) return;
+  for (const p of descendants(tc, "p")) p.setAttribute("paraPrIDRef", id);
+}
+
 function evenSplit(total: number, n: number): number[] {
   const base = Math.floor(total / n);
   return Array.from({ length: n }, (_, i) => (i === n - 1 ? total - base * (n - 1) : base));
@@ -257,7 +264,10 @@ export function buildTable(template: Element, family: Family, spec: TableSpec, n
         );
       }
       if (group) cc = 1;
-      cells.push(makeCell(cellAt(template, proto.name), { col: cc, row: rowAddr, w: widths[cc], h: dataH, lines: [r.name] }));
+      const nameCell = makeCell(cellAt(template, proto.name), { col: cc, row: rowAddr, w: widths[cc], h: dataH, lines: [r.name] });
+      // 과목명은 가운데 정렬한다(서식에 따라 자료 줄의 과목명 칸이 왼쪽 정렬이라, 머리줄 '과목' 칸과 같은 문단 서식으로 맞춘다).
+      alignLike(nameCell, cellAt(template, hp.name));
+      cells.push(nameCell);
       cc++;
       if (lead) {
         cells.push(makeCell(cellAt(template, proto.lead!), { col: cc, row: rowAddr, w: widths[cc], h: dataH, lines: [r.lead ?? ""] }));
