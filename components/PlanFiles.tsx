@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import CurriculumFiles from "@/components/CurriculumFiles";
 import DropZone from "@/components/DropZone";
 import { parseCutoffText } from "@/lib/hwpx/data";
-import { YEARS, valueCountFor, type NoticeKind, type Semester, type Term } from "@/lib/hwpx/docs";
+import { valueCountFor, type NoticeKind, type Term } from "@/lib/hwpx/docs";
 import { fetchIsAdmin, latestPlan, listPlans, savePlan, signedUrl, type PlanKind, type PlanRow } from "@/lib/plans/api";
 import { EXAM_KINDS, EXAM_LABELS } from "@/lib/plans/exams";
 import { extractFromFile, fileTypeOf } from "@/lib/plans/extract";
@@ -22,11 +22,9 @@ const GRADES = ["1", "2", "3"];
 /** 협의록·추정분할점수 구역이 다루는 자료 종류(편제표는 CurriculumFiles가 따로 다룬다) */
 type DocKind = Exclude<PlanKind, "curriculum">;
 
-/** 자료 첨부 탭: 협의록, 추정분할점수, 편제표를 올린다. 학년도·학기는 이 탭에서 따로 고른다(처음 값은 다른 탭에서 고른 값). */
-export default function PlanFiles({ term: initial }: { term: Term }) {
-  const [year, setYear] = useState<number>(initial.year);
-  const [semester, setSemester] = useState<Semester>(initial.semester);
-  const term: Term = { year, semester };
+/** 자료 첨부 탭: 협의록, 추정분할점수, 편제표를 올린다. 학년도·학기는 페이지 위쪽(제목 아래)에서 고른 값을 쓴다. */
+export default function PlanFiles({ term }: { term: Term }) {
+  const { year, semester } = term;
   const [admin, setAdmin] = useState<boolean | null>(null);
   const [rows, setRows] = useState<Record<DocKind, PlanRow[]>>({ minutes: [], cutoffs: [] });
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -58,28 +56,8 @@ export default function PlanFiles({ term: initial }: { term: Term }) {
     <div className="space-y-4">
       <section className={box}>
         <h2 className="font-semibold">올린 자료 보관</h2>
-        <div className="flex flex-wrap items-center gap-3 text-sm">
-          <label className="flex items-center gap-2 font-semibold">
-            학년도
-            <select className={field} value={year} onChange={(e) => setYear(Number(e.target.value))}>
-              {YEARS.map((y) => (
-                <option key={y} value={y}>
-                  {y}학년도
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex items-center gap-2 font-semibold">
-            학기
-            <select className={field} value={semester} onChange={(e) => setSemester(Number(e.target.value) as Semester)}>
-              <option value={1}>1학기</option>
-              <option value={2}>2학기</option>
-            </select>
-          </label>
-          <span className="text-xs text-gray-500">아래 협의록, 추정분할점수(학년별), 편제표(학년별)가 모두 이 학년도·학기의 자료예요.</span>
-        </div>
         <p className="text-sm text-gray-600">
-          평가계획서 교과별 협의록, 학년별 추정분할점수, 학년별 편제표 파일을 보관해요. 올린 자료는 지워지지 않고, 정정하면 새 판이 추가돼요(이전
+          위에서 고른 {year}학년도 {semester}학기의 평가계획서 교과별 협의록, 학년별 추정분할점수, 학년별 편제표 파일을 보관해요. 올린 자료는 지워지지 않고, 정정하면 새 판이 추가돼요(이전
           판은 그대로 남아요). 여기에 올린 자료는 안내·공지 탭에서 불러와 칸을 채우는 데 써요.
         </p>
         <p className={`rounded-md p-2 text-sm ${admin ? "bg-emerald-50 text-emerald-900" : "bg-gray-50 text-gray-700"}`}>

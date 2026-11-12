@@ -73,6 +73,30 @@ export default function CutoffTool() {
           </Link>
         )}
       </div>
+      <div className="flex flex-wrap items-center gap-3 rounded-xl bg-white p-3 text-sm shadow-sm ring-1 ring-black/5">
+        <label className="flex items-center gap-2 font-semibold">
+          학년도
+          <select className="rounded-md border border-gray-300 px-2 py-1" value={year} onChange={(e) => setYear(Number(e.target.value))}>
+            {YEARS.map((y) => (
+              <option key={y} value={y}>
+                {y}학년도
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex items-center gap-2 font-semibold">
+          학기
+          <select
+            className="rounded-md border border-gray-300 px-2 py-1"
+            value={semester}
+            onChange={(e) => setSemester(Number(e.target.value) as Semester)}
+          >
+            <option value={1}>1학기</option>
+            <option value={2}>2학기</option>
+          </select>
+        </label>
+      </div>
+      <p className="-mt-2 text-xs text-gray-500">고른 학년도·학기가 아래 안내, 공지, 자료 첨부에 적용돼요(점검 도구는 계산만 해서 학기와 상관없어요).</p>
       <nav className="flex flex-wrap gap-2 border-b border-gray-200 pb-3">
         {sections.map(([key, label]) => (
           <button
@@ -86,31 +110,6 @@ export default function CutoffTool() {
           </button>
         ))}
       </nav>
-      {section !== "check" && section !== "plans" && (
-        <div className="flex flex-wrap items-center gap-3 rounded-xl bg-white p-3 text-sm shadow-sm ring-1 ring-black/5">
-          <label className="flex items-center gap-2 font-semibold">
-            학년도
-            <select className="rounded-md border border-gray-300 px-2 py-1" value={year} onChange={(e) => setYear(Number(e.target.value))}>
-              {YEARS.map((y) => (
-                <option key={y} value={y}>
-                  {y}학년도
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="flex items-center gap-2 font-semibold">
-            학기
-            <select
-              className="rounded-md border border-gray-300 px-2 py-1"
-              value={semester}
-              onChange={(e) => setSemester(Number(e.target.value) as Semester)}
-            >
-              <option value={1}>1학기</option>
-              <option value={2}>2학기</option>
-            </select>
-          </label>
-        </div>
-      )}
       {section === "guide" && <GuideSection term={{ year, semester }} />}
       {section === "notice" && <NoticeSection term={{ year, semester }} admin={admin === true} />}
       {admin === true && section === "plans" && <PlanFiles term={{ year, semester }} />}
