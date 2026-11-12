@@ -164,8 +164,9 @@ function PlanSection({
     set({ file });
     setNotes(lead);
     if (!file) return;
-    if (!fileTypeOf(file.name)) {
-      setNotes([...lead, "hwpx, xlsx, pdf 파일만 올릴 수 있어요."]);
+    const type = fileTypeOf(file.name);
+    if (!type || (!isMinutes && type === "hwp")) {
+      setNotes([...lead, isMinutes ? "hwp, hwpx, xlsx, pdf 파일만 올릴 수 있어요." : "추정분할점수는 NEIS에서 받은 엑셀(xlsx)이나 PDF, hwpx 파일을 올려 주세요(hwp는 읽지 못해요)."]);
       set({ file: null });
       return;
     }
@@ -391,7 +392,12 @@ function PlanSection({
               </button>
             )}
           </div>
-          <DropZone file={form.file} accept=".hwpx,.xlsx,.pdf" hint="hwpx, xlsx, pdf · 한 번에 하나" onFiles={receiveFiles} />
+          <DropZone
+            file={form.file}
+            accept={isMinutes ? ".hwp,.hwpx,.xlsx,.pdf" : ".hwpx,.xlsx,.pdf"}
+            hint={isMinutes ? "hwp, hwpx, xlsx, pdf · 한 번에 하나" : "hwpx, xlsx, pdf · 한 번에 하나"}
+            onFiles={receiveFiles}
+          />
           {!isMinutes && form.file && EXAM_KINDS.every((k) => form.texts[k].trim() === "") && (
             <p className="rounded-md bg-amber-50 p-2 text-xs text-amber-900">
               파일에서 분할점수 표를 읽지 못했어요. 이대로 저장하면 파일만 보관되고, 공지 탭에서는 불러올 값이 없어요. 아래 칸에 표를 직접 붙여넣을 수도 있어요.
