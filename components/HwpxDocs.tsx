@@ -16,10 +16,11 @@ import {
 import { loadTemplate, safeName, saveFile } from "@/lib/hwpx/client";
 import { latestPlan } from "@/lib/plans/api";
 import { courseNames, findCourse, type Course } from "@/lib/plans/curriculum";
+import { fixedGroupText } from "@/lib/plans/fixed";
 import { tidySubjectNames } from "@/lib/plans/names";
 import type { SubjectPlan } from "@/lib/plans/pdf";
 import { examValueOf } from "@/lib/plans/subjectsText";
-import { AREAS, OTHER as OTHER_AREA, canonicalSubject, subjectsFor } from "@/lib/subjects";
+import { AREAS, OTHER as OTHER_AREA, canonicalSubject, nameKey, subjectsFor } from "@/lib/subjects";
 
 const box = "space-y-3 rounded-xl bg-white p-4 shadow-sm ring-1 ring-black/5";
 const field = "rounded-md border border-gray-300 px-2 py-1";
@@ -481,19 +482,59 @@ export function NoticeSection({ term, admin = false }: { term: Term; admin?: boo
       const found: string[] = [];
       const missing: string[] = [];
       const next = { ...texts[kind] };
+      // 가정통신문과 회의 자료에는 추정분할과 고정분할 과목이 모두 들어가야 한다. NEIS 자료에는 추정 과목만 있으므로,
+      // 편제표의 나머지 과목을 고정분할로 채운다(수행평가 공지는 고정분할 표가 없어 그대로 둔다).
+      const withFixed = kind !== "perf";
+      const plans = new Map<string, SubjectPlan>();
+      if (withFixed) {
+        // 협의록에 적힌 반영 비율로 정기시험을 보지 않는 과목('-')을 알아낸다. 협의록이 없거나 읽지 못해도 계속한다.
+        await Promise.all(
+          AREAS.map(async (a) => {
+            try {
+              const m = await latestPlan("minutes", a, year, semester);
+              const subs = (m?.parsed as { subjects?: SubjectPlan[] } | undefined)?.subjects;
+              for (const sp of Array.isArray(subs) ? subs : []) plans.set(`${sp.grade}|${nameKey(sp.subject)}`, sp);
+            } catch {
+              /* 협의록 없이 진행 */
+            }
+          }),
+        );
+      }
+      let fixedTotal = 0;
+      let assumedTotal = 0;
+      let noCurriculum = false;
       for (const g of [1, 2, 3] as const) {
         const plan = await latestPlan("cutoffs", String(g), year, semester);
         const raw = plan ? String(((plan.parsed as { texts?: Partial<Record<NoticeKind, string>> }).texts ?? {})[kind] ?? "") : "";
-        if (plan && raw.trim() !== "") {
-          // PDF에서 벌어진 과목 이름의 띄어쓰기는 편제표(있으면)와 과목 목록의 표기로 바로잡는다.
-          const curriculum = await latestPlan("curriculum", String(g), year, semester);
-          const known = ((curriculum?.parsed as { courses?: Course[] } | undefined)?.courses ?? []).map((c) => c.subject);
-          next[g] = tidySubjectNames(raw, known);
-          found.push(`${g}학년 ${plan.version}판`);
+        const curriculum = await latestPlan("curriculum", String(g), year, semester);
+        const courses = (curriculum?.parsed as { courses?: Course[] } | undefined)?.courses ?? [];
+        // PDF에서 벌어진 과목 이름의 띄어쓰기는 편제표(있으면)와 과목 목록의 표기로 바로잡는다.
+        let text = raw.trim() !== "" ? tidySubjectNames(raw, courses.map((c) => c.subject)) : "";
+        let label = plan ? `${g}학년 ${plan.version}판` : "";
+        // 추정분할 자료가 있는 학년, 또는 3학년(추정분할 교과가 없는 학년)은 편제표로 고정분할 과목을 채운다.
+        if (withFixed && (text !== "" || g === 3)) {
+          if (courses.length === 0) {
+            noCurriculum = true;
+          } else {
+            const fixed = fixedGroupText(kind, g, courses, text, plans);
+            if (fixed.text !== "") {
+              text = (text !== "" ? text.trimEnd() + "\n" : "") + fixed.text;
+              fixedTotal += fixed.count;
+              assumedTotal += fixed.assumed;
+              label = label || `${g}학년 편제표(모두 고정분할)`;
+            }
+          }
+        }
+        if (text.trim() !== "") {
+          next[g] = text;
+          found.push(label || `${g}학년`);
         } else {
           missing.push(`${g}학년`);
         }
       }
+      if (withFixed && fixedTotal > 0) found.push(`편제표로 고정분할 ${fixedTotal}과목`);
+      if (noCurriculum) found.push("편제표가 없는 학년은 고정분할 과목을 채우지 못함(편제표 탭에서 관리자가 올리면 채워져요)");
+      if (assumedTotal > 0) found.push(`정기시험을 보지 않는 과목은 값을 -로 고쳐 주세요(협의록에서 확인하지 못한 3단계 과목 ${assumedTotal}개는 정기시험을 본다고 가정했어요)`);
       setTexts({ ...texts, [kind]: next });
       setPlanNote({
         ok: found.length > 0,
