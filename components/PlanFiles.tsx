@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import BulkUpload from "@/components/BulkUpload";
 import CurriculumFiles from "@/components/CurriculumFiles";
 import DropZone from "@/components/DropZone";
 import { parseCutoffText } from "@/lib/hwpx/data";
@@ -29,6 +30,8 @@ export default function PlanFiles({ term }: { term: Term }) {
   const [rows, setRows] = useState<Record<DocKind, PlanRow[]>>({ minutes: [], cutoffs: [] });
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reload, setReload] = useState(0);
+  /** 여러 파일 올리기가 끝나면 올린 편제표 목록도 다시 불러오게 하는 신호 */
+  const [curriculumKey, setCurriculumKey] = useState(0);
 
   useEffect(() => {
     let alive = true;
@@ -69,9 +72,18 @@ export default function PlanFiles({ term }: { term: Term }) {
         </p>
         {loadError && <p className="rounded-md bg-red-50 p-2 text-sm text-red-800">{loadError}</p>}
       </section>
+      {admin === true && (
+        <BulkUpload
+          term={term}
+          onDone={() => {
+            setReload((n) => n + 1);
+            setCurriculumKey((n) => n + 1);
+          }}
+        />
+      )}
       <PlanSection kind="minutes" term={term} rows={rows.minutes} admin={admin === true} onSaved={() => setReload((n) => n + 1)} />
       <PlanSection kind="cutoffs" term={term} rows={rows.cutoffs} admin={admin === true} onSaved={() => setReload((n) => n + 1)} />
-      <CurriculumFiles term={term} embedded />
+      <CurriculumFiles term={term} embedded refreshKey={curriculumKey} />
     </div>
   );
 }

@@ -33,7 +33,7 @@ type Form = { scope: string; file: File | null; text: string; note: string; base
 const blank = (): Form => ({ scope: "1", file: null, text: "", note: "", base: null });
 
 /** 학년별 편제표(NEIS '학교교육과정 편제 및 시간배당 관리 보고서', hwp)를 올리는 탭. 관리자만 올리고, 정정은 새 판으로 남긴다. */
-export default function CurriculumFiles({ term, embedded = false }: { term: Term; embedded?: boolean }) {
+export default function CurriculumFiles({ term, embedded = false, refreshKey = 0 }: { term: Term; embedded?: boolean; refreshKey?: number }) {
   const { year, semester } = term;
   const [admin, setAdmin] = useState<boolean | null>(null);
   const [rows, setRows] = useState<PlanRow[]>([]);
@@ -61,7 +61,7 @@ export default function CurriculumFiles({ term, embedded = false }: { term: Term
     return () => {
       alive = false;
     };
-  }, [year, semester, reload]);
+  }, [year, semester, reload, refreshKey]);
 
   const parsedText = parseCoursesText(form.text);
   const hasPrevious = rows.some((r) => r.scope === form.scope);

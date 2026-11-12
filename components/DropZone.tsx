@@ -13,11 +13,14 @@ export default function DropZone({
   accept,
   hint,
   onFiles,
+  multiple = false,
 }: {
   file: File | null;
   accept: string;
   hint: string;
   onFiles: (files: File[]) => void;
+  /** 파일 선택 창에서도 여러 파일을 고를 수 있게 한다(끌어다 놓기는 항상 여러 개를 받는다) */
+  multiple?: boolean;
 }) {
   const [over, setOver] = useState(false);
   const input = useRef<HTMLInputElement>(null);
@@ -59,6 +62,7 @@ export default function DropZone({
       <input
         ref={input}
         type="file"
+        multiple={multiple}
         accept={accept}
         className="sr-only"
         tabIndex={-1}
