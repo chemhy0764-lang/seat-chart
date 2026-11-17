@@ -554,7 +554,8 @@ export function NoticeSection({ term, admin = false }: { term: Term; admin?: boo
   }
   const grades = ([1, 2, 3] as const).map((grade) => {
     const parsed = parseCutoffText(texts[kind][grade], kind === "perf" ? 1 : 0, valueCountFor(kind, grade));
-    const empty = texts[kind][grade].trim() === "";
+    // 글자가 없거나, '추정'·'고정' 표시만 있고 과목 줄이 없으면(오류도 없으면) 빈 칸으로 본다.
+    const empty = texts[kind][grade].trim() === "" || (parsed.groups.length === 0 && parsed.errors.length === 0);
     return { grade, parsed, empty };
   });
   // 3학년은 추정분할 교과가 없을 수 있어 비워 둘 수 있다. 수행평가는 비우면 '전 과목 고정분할' 안내 문구가 그대로 들어가고,
@@ -562,6 +563,10 @@ export function NoticeSection({ term, admin = false }: { term: Term; admin?: boo
   const optional = (g: { grade: number }) => g.grade === 3;
   const ready = grades.every((g) =>
     optional(g) && g.empty ? true : !g.empty && g.parsed.errors.length === 0 && g.parsed.groups.length > 0,
+  );
+  // 내려받기가 막힌 이유(3학년은 비어 있어도 막히지 않는다)
+  const blockers = grades.flatMap((g) =>
+    optional(g) && g.empty ? [] : g.empty ? [`${g.grade}학년 칸이 비어 있어요`] : g.parsed.errors.length > 0 ? [`${g.grade}학년 표에 오류가 있어요(칸 아래 빨간 안내를 고쳐 주세요)`] : [],
   );
 
   const noticeDate = () => {
@@ -663,6 +668,7 @@ export function NoticeSection({ term, admin = false }: { term: Term; admin?: boo
         {!ready && (
           <p className="text-xs text-gray-500">
             1·2학년을 올바르게 붙여넣으면 내려받을 수 있어요(3학년은 비워 둬도 돼요).
+            {blockers.length > 0 && <b className="ml-1 text-amber-800">지금은 {blockers.join(", ")}.</b>}
           </p>
         )}
         <Message message={notice.message} />
